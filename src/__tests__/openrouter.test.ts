@@ -2,6 +2,7 @@
  * Unit tests for OpenRouter provider with z-ai/glm-4.5-air:free
  */
 
+import { describe, expect, test } from 'bun:test';
 import { AutohandSDK, Tool } from '../index.js';
 
 describe('AutohandSDK with OpenRouter provider', () => {
@@ -9,6 +10,7 @@ describe('AutohandSDK with OpenRouter provider', () => {
     const sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'z-ai/glm-4.5-air:free',
+      apiKey: 'test-key',
       debug: false,
     });
 
@@ -19,11 +21,12 @@ describe('AutohandSDK with OpenRouter provider', () => {
     const sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'z-ai/glm-4.5-air:free',
+      apiKey: 'test-key',
     });
 
-    sdk.tools = [Tool.READ_FILE, Tool.WRITE_FILE, Tool.BASH];
+    sdk.tools = [Tool.READ_FILE, Tool.WRITE_FILE, Tool.RUN_COMMAND];
 
-    expect(sdk.tools).toEqual([Tool.READ_FILE, Tool.WRITE_FILE, Tool.BASH]);
+    expect(sdk.tools).toEqual([Tool.READ_FILE, Tool.WRITE_FILE, Tool.RUN_COMMAND]);
   });
 
   test('can load config from JSON file', async () => {
@@ -43,6 +46,7 @@ describe('AutohandSDK with OpenRouter provider', () => {
     const sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'z-ai/glm-4.5-air:free',
+      apiKey: 'test-key',
       autoMode: true,
       unrestricted: true,
       autoSkill: true,
@@ -61,15 +65,14 @@ describe('AutohandSDK with OpenRouter provider', () => {
   test('Tool enum matches actual CLI-3 tool names', () => {
     expect(Tool.READ_FILE).toBe('read_file');
     expect(Tool.WRITE_FILE).toBe('write_file');
-    expect(Tool.BASH).toBe('bash');
+    expect(Tool.RUN_COMMAND).toBe('run_command');
     expect(Tool.WEB_SEARCH).toBe('web_search');
     expect(Tool.GIT_STATUS).toBe('git_status');
     expect(Tool.GIT_DIFF).toBe('git_diff');
     expect(Tool.GIT_LOG).toBe('git_log');
     expect(Tool.GIT_COMMIT).toBe('git_commit');
     expect(Tool.FIND).toBe('find');
-    expect(Tool.GLOB).toBe('glob');
-    expect(Tool.SEARCH_IN_FILES).toBe('search_in_files');
+    expect(Tool.SEARCH).toBe('search');
     expect(Tool.APPLY_PATCH).toBe('apply_patch');
     expect(Tool.NOTEBOOK_READ).toBe('notebook_read');
     expect(Tool.NOTEBOOK_EDIT).toBe('notebook_edit');
@@ -81,9 +84,10 @@ describe('SDK Configuration', () => {
     const sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'z-ai/glm-4.5-air:free',
+      apiKey: 'test-key',
     });
 
-    sdk.tools = [Tool.READ_FILE, Tool.BASH];
+    sdk.tools = [Tool.READ_FILE, Tool.RUN_COMMAND];
     expect(sdk.tools).toHaveLength(2);
   });
 
@@ -92,11 +96,11 @@ describe('SDK Configuration', () => {
       cliPath: '/path/to/cli',
     });
 
-    sdk.tools = [Tool.READ_FILE, Tool.WRITE_FILE, Tool.BASH];
+    sdk.tools = [Tool.READ_FILE, Tool.WRITE_FILE, Tool.RUN_COMMAND];
     expect(sdk.tools).toEqual([
       Tool.READ_FILE,
       Tool.WRITE_FILE,
-      Tool.BASH,
+      Tool.RUN_COMMAND,
     ]);
   });
 });

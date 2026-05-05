@@ -28,16 +28,66 @@ import type {
   PromptResult,
   AbortParams,
   AbortResult,
+  PlanModeSetResult,
   GetStateParams,
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
   ProviderName,
+  SkillReference,
+  HookDefinition,
+  AddHookParams,
+  AddHookResult,
+  RemoveHookParams,
+  RemoveHookResult,
+  ToggleHookParams,
+  ToggleHookResult,
+  TestHookParams,
+  TestHookResult,
+  GetHooksResult,
+  PermissionMode,
+  LegacyPermissionMode,
 } from '../types/index.js';
-import { detectProviderFromModel, validateProviderConfig } from '../types/index.js';
+import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
+
+function scopedDecision(
+  allowed: boolean,
+  remember: boolean | undefined
+): PermissionDecision {
+  if (allowed) {
+    return remember === true ? 'allow_session' : 'allow_once';
+  }
+  return remember === true ? 'deny_session' : 'deny_once';
+}
+
+function normalizePermissionResponse(params: PermissionResponseParams): PermissionResponseParams {
+  if (params.decision === 'allow') {
+    return {
+      ...params,
+      decision: scopedDecision(true, params.remember),
+    };
+  }
+
+  if (params.decision === 'deny') {
+    return {
+      ...params,
+      decision: scopedDecision(false, params.remember),
+    };
+  }
+
+  if (params.decision === undefined && params.allowed !== undefined && params.remember === true) {
+    return {
+      ...params,
+      decision: scopedDecision(params.allowed, params.remember),
+    };
+  }
+
+  return params;
+}
 
 export class RPCClient {
   private transport: Transport;
@@ -71,19 +121,28 @@ export class RPCClient {
    */
   constructor(config: SDKConfig = {}) {
     // Detect provider from model ID if not explicitly set
-    const detectedProvider = config.model ? detectProviderFromModel(config.model) : undefined;
+    const detectedProvider = config.model !== undefined ? detectProviderFromModel(config.model) : undefined;
     const provider = config.provider ?? detectedProvider;
 
     // Validate provider-specific configuration if provider is set
-    if (provider) {
-      try {
-        validateProviderConfig(provider, config);
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(`Provider configuration error for ${provider}: ${error.message}`);
-        }
-        throw error;
+    if (provider !== undefined) {
+      validateProviderConfig(provider, config);
+    }
+
+    // Process skills - extract names from file paths and resolve references
+    const skillSettings = Array.isArray(config.skills) ? undefined : config.skills;
+    const skillRefs: SkillReference[] = config.skillRefs ?? (Array.isArray(config.skills) ? config.skills : skillSettings?.skills) ?? [];
+    const processedSkills: string[] = [];
+    const skillFilesToCopy: string[] = [];
+
+    for (const ref of skillRefs) {
+      const name = getSkillName(ref);
+      const path = getSkillPath(ref);
+      if (path !== undefined) {
+        // File path detected - queue for copying
+        skillFilesToCopy.push(path);
       }
+      processedSkills.push(name);
     }
 
     const transportOptions: {
@@ -121,15 +180,16 @@ export class RPCClient {
       compressionThreshold?: number;
       summarizationThreshold?: number;
       skills?: string[];
+      skillFiles?: string[];
       skillSources?: string[];
       installMissingSkills?: boolean;
-      permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto';
-      permissionAllowList?: string[];
-      permissionDenyList?: string[];
       provider?: ProviderName | undefined;
       apiKey?: string;
       baseUrl?: string;
       port?: number;
+      envVars?: import('../types/index.js').AutohandEnvVars;
+      hooksEnabled?: boolean;
+      hooksDefinitions?: HookDefinition[];
     } = {};
 
     if (config.cwd !== undefined) transportOptions.cwd = config.cwd;
@@ -139,7 +199,7 @@ export class RPCClient {
     if (config.autoMode !== undefined) transportOptions.autoMode = config.autoMode;
     if (config.unrestricted !== undefined) transportOptions.unrestricted = config.unrestricted;
     if (config.autoSkill !== undefined) transportOptions.autoSkill = config.autoSkill;
-    if (config.skills?.autoSkill !== undefined) transportOptions.autoSkill = config.skills.autoSkill;
+    if (skillSettings?.autoSkill !== undefined) transportOptions.autoSkill = skillSettings.autoSkill;
     if (config.autoCommit !== undefined) transportOptions.autoCommit = config.autoCommit;
     if (config.contextCompact !== undefined) transportOptions.contextCompact = config.contextCompact;
     if (config.context?.contextCompact !== undefined) transportOptions.contextCompact = config.context.contextCompact;
@@ -147,7 +207,9 @@ export class RPCClient {
     if (config.maxRuntime !== undefined) transportOptions.maxRuntime = config.maxRuntime;
     if (config.maxCost !== undefined) transportOptions.maxCost = config.maxCost;
     if (config.sysPrompt !== undefined) transportOptions.sysPrompt = config.sysPrompt;
+    if (config.systemPrompt !== undefined) transportOptions.sysPrompt = config.systemPrompt;
     if (config.appendSysPrompt !== undefined) transportOptions.appendSysPrompt = config.appendSysPrompt;
+    if (config.appendSystemPrompt !== undefined) transportOptions.appendSysPrompt = config.appendSystemPrompt;
     if (config.model !== undefined) transportOptions.model = config.model;
     if (config.temperature !== undefined) transportOptions.temperature = config.temperature;
     if (config.yolo !== undefined) transportOptions.yolo = config.yolo;
@@ -156,6 +218,7 @@ export class RPCClient {
     if (config.addDir !== undefined) transportOptions.addDir = config.addDir;
     if (config.extraArgs !== undefined) transportOptions.extraArgs = config.extraArgs;
     if (config.persistSession !== undefined) transportOptions.persistSession = config.persistSession;
+    if (config.session?.persist !== undefined) transportOptions.persistSession = config.session.persist;
     if (config.session?.persistSession !== undefined) transportOptions.persistSession = config.session.persistSession;
     if (config.sessionId !== undefined) transportOptions.sessionId = config.sessionId;
     if (config.session?.sessionId !== undefined) transportOptions.sessionId = config.session.sessionId;
@@ -165,23 +228,27 @@ export class RPCClient {
     if (config.session?.continue !== undefined) transportOptions.continue = config.session.continue;
     if (config.session?.sessionPath !== undefined) transportOptions.sessionPath = config.session.sessionPath;
     if (config.session?.autoSaveInterval !== undefined) transportOptions.autoSaveInterval = config.session.autoSaveInterval;
+    if (config.agentsMd?.enabled !== undefined) transportOptions.agentsMdEnable = config.agentsMd.enabled;
     if (config.agentsMd?.enable !== undefined) transportOptions.agentsMdEnable = config.agentsMd.enable;
+    if (config.agentsMd?.createDefault !== undefined) transportOptions.agentsMdCreate = config.agentsMd.createDefault;
     if (config.agentsMd?.create !== undefined) transportOptions.agentsMdCreate = config.agentsMd.create;
     if (config.agentsMd?.path !== undefined) transportOptions.agentsMdPath = config.agentsMd.path;
     if (config.agentsMd?.autoUpdate !== undefined) transportOptions.agentsMdAutoUpdate = config.agentsMd.autoUpdate;
     if (config.context?.maxTokens !== undefined) transportOptions.maxTokens = config.context.maxTokens;
+    if (config.context?.compactThreshold !== undefined) transportOptions.compressionThreshold = config.context.compactThreshold;
     if (config.context?.compressionThreshold !== undefined) transportOptions.compressionThreshold = config.context.compressionThreshold;
     if (config.context?.summarizationThreshold !== undefined) transportOptions.summarizationThreshold = config.context.summarizationThreshold;
-    if (config.skills?.skills !== undefined) transportOptions.skills = config.skills.skills;
-    if (config.skills?.sources !== undefined) transportOptions.skillSources = config.skills.sources;
-    if (config.skills?.installMissing !== undefined) transportOptions.installMissingSkills = config.skills.installMissing;
-    if (config.permissionMode !== undefined) transportOptions.permissionMode = config.permissionMode;
-    if (config.permissions?.allowList !== undefined) transportOptions.permissionAllowList = config.permissions.allowList;
-    if (config.permissions?.denyList !== undefined) transportOptions.permissionDenyList = config.permissions.denyList;
+    if (processedSkills.length > 0) transportOptions.skills = processedSkills;
+    if (skillFilesToCopy.length > 0) transportOptions.skillFiles = skillFilesToCopy;
+    if (skillSettings?.sources !== undefined) transportOptions.skillSources = skillSettings.sources;
+    if (skillSettings?.installMissing !== undefined) transportOptions.installMissingSkills = skillSettings.installMissing;
     if (provider !== undefined) transportOptions.provider = provider;
     if (config.apiKey !== undefined) transportOptions.apiKey = config.apiKey;
     if (config.baseUrl !== undefined) transportOptions.baseUrl = config.baseUrl;
     if (config.port !== undefined) transportOptions.port = config.port;
+    if (config.envVars !== undefined) transportOptions.envVars = config.envVars;
+    if (config.hooks?.enabled !== undefined) transportOptions.hooksEnabled = config.hooks.enabled;
+    if (config.hooks?.hooks !== undefined) transportOptions.hooksDefinitions = config.hooks.hooks;
 
     this.transport = new Transport(transportOptions);
 
@@ -252,7 +319,7 @@ export class RPCClient {
    * @returns Response result
    */
   async permissionResponse(params: PermissionResponseParams): Promise<unknown> {
-    return this.transport.request('autohand.permissionResponse', params);
+    return this.transport.request('autohand.permissionResponse', normalizePermissionResponse(params));
   }
 
   /**
@@ -261,8 +328,21 @@ export class RPCClient {
    * @param mode - Permission mode to set
    * @returns Result of the operation
    */
-  async setPermissionMode(mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto'): Promise<unknown> {
-    return this.transport.request('autohand.setPermissionMode', { mode });
+  async setPermissionMode(mode: PermissionMode | LegacyPermissionMode): Promise<unknown> {
+    return this.transport.request('autohand.permissionModeSet', { mode });
+  }
+
+  /**
+   * Enable or disable CLI plan mode.
+   *
+   * Plan mode is separate from permission mode. When enabled, CLI-3 restricts
+   * the agent to read-only planning tools until the plan is accepted.
+   *
+   * @param enabled - Whether plan mode should be active
+   * @returns Result of the operation
+   */
+  async setPlanMode(enabled: boolean): Promise<PlanModeSetResult> {
+    return this.transport.request('autohand.planModeSet', { enabled }) as Promise<PlanModeSetResult>;
   }
 
   /**
@@ -272,7 +352,7 @@ export class RPCClient {
    * @returns Result of the operation
    */
   async setModel(model?: string): Promise<unknown> {
-    return this.transport.request('autohand.setModel', { model });
+    return this.transport.request('autohand.modelSet', { model });
   }
 
   /**
@@ -282,7 +362,7 @@ export class RPCClient {
    * @returns Result of the operation
    */
   async setMaxThinkingTokens(maxThinkingTokens: number | null): Promise<unknown> {
-    return this.transport.request('autohand.setMaxThinkingTokens', { maxThinkingTokens });
+    return this.transport.request('autohand.maxThinkingTokensSet', { maxThinkingTokens });
   }
 
   /**
@@ -372,6 +452,55 @@ export class RPCClient {
   }
 
   /**
+   * Get all hooks and settings
+   * 
+   * @returns Hooks settings including all hook definitions
+   */
+  async getHooks(): Promise<GetHooksResult> {
+    return this.transport.request('autohand.hooks.getHooks', {}) as Promise<GetHooksResult>;
+  }
+
+  /**
+   * Add a new hook
+   * 
+   * @param params - Hook definition to add
+   * @returns Result with success status and hook ID
+   */
+  async addHook(params: AddHookParams): Promise<AddHookResult> {
+    return this.transport.request('autohand.hooks.addHook', params) as Promise<AddHookResult>;
+  }
+
+  /**
+   * Remove a hook by event and index
+   * 
+   * @param params - Event type and hook index
+   * @returns Result indicating success
+   */
+  async removeHook(params: RemoveHookParams): Promise<RemoveHookResult> {
+    return this.transport.request('autohand.hooks.removeHook', params) as Promise<RemoveHookResult>;
+  }
+
+  /**
+   * Toggle a hook's enabled status
+   * 
+   * @param params - Event type and hook index
+   * @returns Result with new enabled status
+   */
+  async toggleHook(params: ToggleHookParams): Promise<ToggleHookResult> {
+    return this.transport.request('autohand.hooks.toggleHook', params) as Promise<ToggleHookResult>;
+  }
+
+  /**
+   * Test a hook with a sample context
+   * 
+   * @param params - Hook definition to test
+   * @returns Execution result including stdout, stderr, and response
+   */
+  async testHook(params: TestHookParams): Promise<TestHookResult> {
+    return this.transport.request('autohand.hooks.testHook', params) as Promise<TestHookResult>;
+  }
+
+  /**
    * Send a custom RPC request
    * 
    * @param method - RPC method name
@@ -394,7 +523,10 @@ export class RPCClient {
     while (true) {
       // Deliver queued events first
       while (this.eventQueue.length > 0) {
-        yield this.eventQueue.shift()!;
+        const event = this.eventQueue.shift();
+        if (event !== undefined) {
+          yield event;
+        }
       }
 
       // Wait for next event
@@ -415,23 +547,23 @@ export class RPCClient {
    */
   private setupNotificationHandlers(): void {
     // Agent lifecycle
-    this.transport.onNotification('agent_start', (params) => {
+    this.transport.onNotification('autohand.agentStart', (params) => {
       const p = params as { sessionId: string; model: string; workspace: string; timestamp: string };
       this.queueEvent({ type: 'agent_start', sessionId: p.sessionId, model: p.model, workspace: p.workspace, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('agent_end', (params) => {
+    this.transport.onNotification('autohand.agentEnd', (params) => {
       const p = params as { sessionId: string; reason: 'completed' | 'aborted' | 'error'; timestamp: string };
       this.queueEvent({ type: 'agent_end', sessionId: p.sessionId, reason: p.reason, timestamp: p.timestamp });
     });
 
     // Turn lifecycle
-    this.transport.onNotification('turn_start', (params) => {
+    this.transport.onNotification('autohand.turnStart', (params) => {
       const p = params as { turnId: string; timestamp: string };
       this.queueEvent({ type: 'turn_start', turnId: p.turnId, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('turn_end', (params) => {
+    this.transport.onNotification('autohand.turnEnd', (params) => {
       const p = params as { turnId: string; timestamp: string };
       // Map turn_end to agent_end for streamPrompt to detect completion
       this.queueEvent({ type: 'agent_end', reason: 'completed', sessionId: p.turnId, timestamp: new Date().toISOString() });
@@ -439,12 +571,12 @@ export class RPCClient {
     });
 
     // Message lifecycle
-    this.transport.onNotification('message_start', (params) => {
+    this.transport.onNotification('autohand.messageStart', (params) => {
       const p = params as { messageId: string; role: 'assistant'; timestamp: string };
       this.queueEvent({ type: 'message_start', messageId: p.messageId, role: p.role, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('message_update', (params) => {
+    this.transport.onNotification('autohand.messageUpdate', (params) => {
       const p = params as { messageId?: string; delta: string; thought?: string; timestamp: string };
       const event: { type: 'message_update'; delta: string; timestamp: string; messageId?: string; thought?: string } = { type: 'message_update', delta: p.delta, timestamp: p.timestamp };
       if (p.messageId !== undefined) event.messageId = p.messageId;
@@ -452,28 +584,23 @@ export class RPCClient {
       this.queueEvent(event);
     });
 
-    this.transport.onNotification('message_end', (params) => {
+    this.transport.onNotification('autohand.messageEnd', (params) => {
       const p = params as { messageId: string; content: string; timestamp: string };
       this.queueEvent({ type: 'message_end', messageId: p.messageId, content: p.content, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('message', (params) => {
-      // Handle single message event with full content
-      this.queueEvent({ type: 'message_end', content: params as string, messageId: 'unknown', timestamp: new Date().toISOString() });
-    });
-
     // Tool lifecycle
-    this.transport.onNotification('tool_start', (params) => {
+    this.transport.onNotification('autohand.toolStart', (params) => {
       const p = params as { toolId: string; toolName: string; args: Record<string, unknown>; timestamp: string };
       this.queueEvent({ type: 'tool_start', toolId: p.toolId, toolName: p.toolName, args: p.args, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('tool_update', (params) => {
+    this.transport.onNotification('autohand.toolUpdate', (params) => {
       const p = params as { toolId: string; output: string; stream: 'stdout' | 'stderr'; timestamp: string };
       this.queueEvent({ type: 'tool_update', toolId: p.toolId, output: p.output, stream: p.stream, timestamp: p.timestamp });
     });
 
-    this.transport.onNotification('tool_end', (params) => {
+    this.transport.onNotification('autohand.toolEnd', (params) => {
       const p = params as { toolId: string; toolName: string; success: boolean; output?: string; error?: string; timestamp: string };
       const event: { type: 'tool_end'; toolId: string; toolName: string; success: boolean; timestamp: string; output?: string; error?: string } = { type: 'tool_end', toolId: p.toolId, toolName: p.toolName, success: p.success, timestamp: p.timestamp };
       if (p.output !== undefined) event.output = p.output;
@@ -482,16 +609,13 @@ export class RPCClient {
     });
 
     // File modifications
-    this.transport.onNotification('file_modified', (params) => {
-      // Map to tool_end for now - this is a temporary workaround
-      const p = params as { toolId: string; toolName: string; success: boolean; output?: string; timestamp: string };
-      const event: { type: 'tool_end'; toolId: string; toolName: string; success: boolean; timestamp: string; output?: string } = { type: 'tool_end', toolId: p.toolId, toolName: p.toolName, success: p.success, timestamp: p.timestamp };
-      if (p.output !== undefined) event.output = p.output;
-      this.queueEvent(event);
+    this.transport.onNotification('autohand.hook.fileModified', (params) => {
+      const p = params as { filePath: string; changeType: 'create' | 'modify' | 'delete'; toolId: string; timestamp: string };
+      this.queueEvent({ type: 'file_modified', filePath: p.filePath, changeType: p.changeType, toolId: p.toolId, timestamp: p.timestamp });
     });
 
     // Permission requests
-    this.transport.onNotification('permission_request', (params) => {
+    this.transport.onNotification('autohand.permissionRequest', (params) => {
       const p = params as { requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; options?: string[]; timestamp: string };
       const event: { type: 'permission_request'; requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; timestamp: string; options?: string[] } = { type: 'permission_request', requestId: p.requestId, tool: p.tool, description: p.description, context: p.context, timestamp: p.timestamp };
       if (p.options !== undefined) event.options = p.options;
@@ -499,7 +623,7 @@ export class RPCClient {
     });
 
     // Errors
-    this.transport.onNotification('error', (params) => {
+    this.transport.onNotification('autohand.error', (params) => {
       const p = params as { code: number; message: string; recoverable: boolean; timestamp: string };
       this.queueEvent({ type: 'error', code: p.code, message: p.message, recoverable: p.recoverable, timestamp: p.timestamp });
     });
@@ -534,4 +658,3 @@ export class RPCClient {
     return this.transport.isRunning();
   }
 }
-

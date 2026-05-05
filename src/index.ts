@@ -11,7 +11,7 @@
  * 
  * const sdk = new AutohandSDK({
  *   cwd: '/path/to/project',
- *   model: 'claude-sonnet-4-20250514',
+ *   model: 'openrouter/auto',
  *   debug: true,
  * });
  * 
@@ -24,6 +24,19 @@
  * 
  * @packageDocumentation
  */
+
+/**
+ * High-level Agent and Run API
+ */
+export { Agent, Run, StructuredOutputError, parseJsonText } from './sdk/agent.js';
+export type {
+  AgentInput,
+  AgentOptions,
+  AgentSendOptions,
+  JsonParseOptions,
+  JsonRunOptions,
+  RunResult,
+} from './sdk/agent.js';
 
 /**
  * Main SDK class for interacting with the Autohand CLI
@@ -58,7 +71,7 @@ export { Tool } from './types/index.js';
 /**
  * Provider detection and types
  */
-export type { ProviderName } from './types/index.js';
+export type { ProviderName, AutohandEnvVars } from './types/index.js';
 export { detectProviderFromModel, ProviderConfigError, validateProviderConfig } from './types/index.js';
 
 /**
@@ -69,7 +82,8 @@ export type { PermissionMode, PermissionRule, PermissionSettings } from './types
 /**
  * Skill types and settings
  */
-export type { SkillSource, SkillFrontmatter, SkillDefinition, SkillSettings } from './types/index.js';
+export type { SkillSource, SkillFrontmatter, SkillDefinition, SkillSettings, SkillReference } from './types/index.js';
+export { isSkillFilePath, getSkillName, getSkillPath } from './types/index.js';
 
 /**
  * Context management types
@@ -91,3 +105,25 @@ export type { SessionType, SessionMetadata, SessionSettings } from './types/inde
  */
 export type { AgentsMdSettings } from './types/index.js';
 export { loadAgentsMd, createDefaultAgentsMd } from './types/index.js';
+
+/**
+ * Hooks types and helpers (matching CLI-3 HookManager)
+ */
+export type {
+  HookEvent,
+  HookDefinition,
+  HookFilter,
+  HookResponse,
+  HooksSettings,
+  HookContext,
+  HookExecutionResult,
+  AddHookParams,
+  RemoveHookParams,
+  ToggleHookParams,
+  TestHookParams,
+  AddHookResult,
+  RemoveHookResult,
+  ToggleHookResult,
+  TestHookResult,
+  GetHooksResult,
+} from './types/index.js';

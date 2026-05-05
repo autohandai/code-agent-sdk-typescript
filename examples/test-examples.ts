@@ -25,12 +25,20 @@ for (const file of exampleFiles) {
     const filePath = join(examplesDir, file);
     const content = readFileSync(filePath, 'utf-8');
 
-    // Validate structure
+    const usesSDK = content.includes('new AutohandSDK') || content.includes('import { AutohandSDK }');
+    const usesAgent = content.includes('Agent.create') || content.includes('import { Agent }');
+
+    // Validate structure without requiring every example to use the same API layer.
     const checks = {
-      hasImport: content.includes('import { AutohandSDK }'),
+      hasSdkImport: content.includes("from '../src/index.js'"),
       hasMain: content.includes('async function main'),
-      hasStart: content.includes('await sdk.start'),
-      hasStop: content.includes('await sdk.stop'),
+      hasLifecycleStart: usesAgent
+        ? content.includes('Agent.create')
+        : content.includes('await sdk.start'),
+      hasLifecycleStop: usesAgent
+        ? content.includes('await agent.close')
+        : content.includes('await sdk.stop') || content.includes('await sdk.close'),
+      hasSupportedApi: usesSDK || usesAgent,
       hasErrorHandling: content.includes('try {') && content.includes('catch'),
     };
 

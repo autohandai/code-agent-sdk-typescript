@@ -12,7 +12,7 @@
  * ```typescript
  * const sdk = new AutohandSDK({
  *   cwd: '/path/to/project',
- *   model: 'claude-sonnet-4-20250514',
+ *   model: 'openrouter/auto',
  *   permissionMode: 'default',
  * });
  * 
@@ -34,6 +34,7 @@ import type {
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  PermissionDecisionScope,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -43,13 +44,125 @@ import type {
   McpServerConfig,
   SessionStats,
   SessionMetadata,
+  SkillReference,
+  HooksSettings,
+  HookDefinition,
+  HookEvent,
+  AddHookResult,
+  RemoveHookResult,
+  ToggleHookResult,
+  TestHookResult,
+  GetHooksResult,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
+
+/**
+ * Process AGENTS.md configuration from prompt params
+ * Handles loading from paths, URLs, or inline content
+ */
+async function processAgentsMdConfig(
+  agentsMd: PromptParams['agentsMd'],
+  _cwd: string
+): Promise<{ content?: string; path?: string; auto?: true } | undefined> {
+  if (agentsMd === undefined) return undefined;
+
+  // String form: path, URL, content, or 'auto'
+  if (typeof agentsMd === 'string') {
+    if (agentsMd === 'auto') {
+      // Auto-detect from workspace
+      return { auto: true };
+    }
+    // Check if it's a URL
+    if (agentsMd.startsWith('http://') || agentsMd.startsWith('https://')) {
+      const content = await loadAgentsMd(agentsMd);
+      return { content };
+    }
+    // Check if it's a file path
+    if (agentsMd.startsWith('file://') || agentsMd.endsWith('.md') || agentsMd.includes('/')) {
+      const content = await loadAgentsMd(agentsMd);
+      return { content, path: agentsMd };
+    }
+    // Treat as raw content
+    return { content: agentsMd };
+  }
+
+  // Object form
+  if (agentsMd.path !== undefined) {
+    const content = await loadAgentsMd(agentsMd.path);
+    return { content, path: agentsMd.path };
+  }
+  if (agentsMd.content !== undefined) {
+    return { content: agentsMd.content };
+  }
+  if (agentsMd.auto === true) {
+    return { auto: true };
+  }
+
+  return undefined;
+}
+
+function addAgentsMdToPrompt(
+  params: PromptParams,
+  agentsMd: { content?: string; path?: string; auto?: true }
+): PromptParams {
+  const prompt: PromptParams = {
+    message: params.message,
+    context: {
+      ...(params.context ?? {}),
+      agentsMd,
+    },
+  };
+  if (params.images !== undefined) {
+    prompt.images = params.images;
+  }
+  if (params.thinkingLevel !== undefined) {
+    prompt.thinkingLevel = params.thinkingLevel;
+  }
+  return prompt;
+}
+
+function allowDecision(scope: PermissionDecisionScope) {
+  switch (scope) {
+    case 'once':
+      return 'allow_once' as const;
+    case 'session':
+      return 'allow_session' as const;
+    case 'project':
+      return 'allow_always_project' as const;
+    case 'user':
+      return 'allow_always_user' as const;
+  }
+}
+
+function denyDecision(scope: PermissionDecisionScope) {
+  switch (scope) {
+    case 'once':
+      return 'deny_once' as const;
+    case 'session':
+      return 'deny_session' as const;
+    case 'project':
+      return 'deny_always_project' as const;
+    case 'user':
+      return 'deny_always_user' as const;
+  }
+}
+
+function requiresStartupPermissionModeRpc(
+  mode: SDKConfig['permissionMode']
+): mode is Exclude<NonNullable<SDKConfig['permissionMode']>, 'plan' | 'default' | 'interactive' | 'ask' | 'yolo'> {
+  return mode !== undefined
+    && mode !== 'plan'
+    && mode !== 'default'
+    && mode !== 'interactive'
+    && mode !== 'ask'
+    && mode !== 'yolo';
+}
 
 export class AutohandSDK {
   private client: RPCClient;
   private started: boolean = false;
   private _tools: Tool[] = [];
+  private _skills: SkillReference[] = [];
 
   /**
    * Create a new AutohandSDK instance
@@ -64,7 +177,8 @@ export class AutohandSDK {
    * @param config.timeout - Request timeout in milliseconds (default: 300000)
    * @param config.model - Model to use for agent execution
    * @param config.permissionMode - Permission mode for tool execution
-   * @param config.systemPrompt - System prompt (inline string or file path)
+   * @param config.systemPrompt - Replace the system prompt (inline string or file path)
+   * @param config.appendSystemPrompt - Append to the default system prompt (inline string or file path)
    * @param config.mcpServers - MCP server configurations
    * @param config.env - Environment variables to pass to CLI
    * 
@@ -79,6 +193,24 @@ export class AutohandSDK {
    */
   constructor(private config: SDKConfig = {}) {
     this.client = new RPCClient(config);
+    // Initialize skills from config if provided
+    const skillRefs = config.skillRefs ?? (Array.isArray(config.skills) ? config.skills : config.skills?.skills);
+    if (skillRefs) {
+      this._skills = skillRefs;
+    }
+  }
+
+  private rebuildClient(): void {
+    const clientConfig: SDKConfig = this._skills.length > 0
+      ? { ...this.config, skillRefs: this._skills }
+      : this.config;
+    this.client = new RPCClient(clientConfig);
+  }
+
+  private ensureNotStarted(operation: string): void {
+    if (this.started) {
+      throw new Error(`${operation} must be called before start().`);
+    }
   }
 
   // ============================================================================
@@ -112,6 +244,93 @@ export class AutohandSDK {
   }
 
   // ============================================================================
+  // Skills Property
+  // ============================================================================
+
+  /**
+   * Set the skills for the agent.
+   *
+   * Skills can be:
+   * - Built-in skill names: 'typescript', 'react', 'testing'
+   * - File paths to SKILL.md files: './skills/custom/SKILL.md'
+   * - Objects with explicit name and path: { name: 'custom', path: './skills/SKILL.md' }
+   *
+   * File paths are auto-detected and the SDK copies them to ~/.autohand/skills/
+   * before starting the CLI.
+   *
+   * @param skills - Array of skill references
+   *
+   * @example
+   * ```typescript
+   * // Simple skill names
+   * sdk.skills = ['typescript', 'react'];
+   *
+   * // Mix of names and file paths
+   * sdk.skills = ['typescript', './skills/my-custom/SKILL.md'];
+   *
+   * // Explicit objects for control
+   * sdk.skills = [
+   *   'typescript',
+   *   { name: 'my-skill', path: './skills/SKILL.md', scope: 'project' }
+   * ];
+   * ```
+   */
+  set skills(skills: SkillReference[]) {
+    this._skills = skills;
+  }
+
+  /**
+   * Get the current skills configured for the agent
+   */
+  get skills(): SkillReference[] {
+    return this._skills;
+  }
+
+  // ============================================================================
+  // System Prompt Configuration
+  // ============================================================================
+
+  /**
+   * Replace the CLI system prompt for this session.
+   *
+   * This maps to CLI-3's --sys-prompt option and must be configured before
+   * start(). The value can be inline prompt text or a file path, matching CLI
+   * behavior.
+   *
+   * Replacing the system prompt bypasses the default Autohand prompt, so most
+   * integrations should prefer appendSystemPrompt unless they intentionally own
+   * the full agent contract.
+   *
+   * @param promptOrPath - Inline system prompt text or a prompt file path
+   * @returns The SDK instance for chaining
+   */
+  setSystemPrompt(promptOrPath: string): this {
+    this.ensureNotStarted('setSystemPrompt');
+    this.config.sysPrompt = promptOrPath;
+    delete this.config.systemPrompt;
+    this.rebuildClient();
+    return this;
+  }
+
+  /**
+   * Append instructions to the default CLI system prompt for this session.
+   *
+   * This maps to CLI-3's --append-sys-prompt option and must be configured
+   * before start(). The value can be inline prompt text or a file path, matching
+   * CLI behavior.
+   *
+   * @param promptOrPath - Inline text or a prompt file path to append
+   * @returns The SDK instance for chaining
+   */
+  appendSystemPrompt(promptOrPath: string): this {
+    this.ensureNotStarted('appendSystemPrompt');
+    this.config.appendSysPrompt = promptOrPath;
+    delete this.config.appendSystemPrompt;
+    this.rebuildClient();
+    return this;
+  }
+
+  // ============================================================================
   // Lifecycle Methods
   // ============================================================================
 
@@ -134,8 +353,24 @@ export class AutohandSDK {
       return;
     }
 
+    // If skills were set after construction, update config and rebuild client
+    if (this._skills.length > 0) {
+      this.config.skillRefs = this._skills;
+      this.client = new RPCClient(this.config);
+    }
+
     await this.client.start();
     this.started = true;
+
+    const startupPermissionMode = this.config.permissionMode;
+    if (requiresStartupPermissionModeRpc(startupPermissionMode)) {
+      await this.client.setPermissionMode(startupPermissionMode);
+    }
+
+    const shouldEnablePlanMode = this.config.planMode ?? this.config.permissionMode === 'plan';
+    if (shouldEnablePlanMode) {
+      await this.client.setPlanMode(true);
+    }
   }
 
   /**
@@ -209,7 +444,18 @@ export class AutohandSDK {
    */
   async prompt(params: PromptParams): Promise<void> {
     await this.ensureStarted();
-    await this.client.prompt(params);
+
+    // Process AGENTS.md if provided in prompt params
+    let processedParams = params;
+    if (params.agentsMd !== undefined) {
+      const cwd = this.config.cwd ?? process.cwd();
+      const agentsMdData = await processAgentsMdConfig(params.agentsMd, cwd);
+      if (agentsMdData !== undefined) {
+        processedParams = addAgentsMdToPrompt(params, agentsMdData);
+      }
+    }
+
+    await this.client.prompt(processedParams);
   }
 
   /**
@@ -238,13 +484,55 @@ export class AutohandSDK {
   async *streamPrompt(params: PromptParams): AsyncGenerator<SDKEvent> {
     await this.ensureStarted();
 
-    // Start the prompt in the background
-    this.client.prompt(params).catch((error) => {
-      console.error('Prompt failed:', error);
-    });
+    // Process AGENTS.md if provided in prompt params
+    let processedParams = params;
+    if (params.agentsMd !== undefined) {
+      const cwd = this.config.cwd ?? process.cwd();
+      const agentsMdData = await processAgentsMdConfig(params.agentsMd, cwd);
+      if (agentsMdData !== undefined) {
+        processedParams = addAgentsMdToPrompt(params, agentsMdData);
+      }
+    }
+
+    let promptSettled = false;
+    let promptError: unknown;
+    const promptCompletion = this.client.prompt(processedParams)
+      .then(() => {
+        promptSettled = true;
+      })
+      .catch((error: unknown) => {
+        promptSettled = true;
+        promptError = error;
+      });
+
+    const events = this.client.events();
 
     // Stream events
-    for await (const event of this.client.events()) {
+    while (true) {
+      if (promptError !== undefined) {
+        throw promptError;
+      }
+
+      const nextEvent = events.next();
+      const result = promptSettled
+        ? { type: 'event' as const, value: await nextEvent }
+        : await Promise.race([
+          nextEvent.then((value) => ({ type: 'event' as const, value })),
+          promptCompletion.then(() => ({ type: 'prompt' as const })),
+        ]);
+
+      if (result.type === 'prompt') {
+        if (promptError !== undefined) {
+          throw promptError;
+        }
+        continue;
+      }
+
+      if (result.value.done === true) {
+        break;
+      }
+
+      const event = result.value.value;
       yield event;
 
       // Stop streaming when agent ends
@@ -317,13 +605,14 @@ export class AutohandSDK {
   /**
    * Change the permission mode for the current session
    * 
-   * Permission modes control how the agent handles tool execution requests:
-   * - 'default': Ask for permission for each tool
-   * - 'acceptEdits': Auto-accept file edits
-   * - 'bypassPermissions': Run all tools without asking
-   * - 'plan': Plan mode for complex tasks
-   * - 'dontAsk': Never ask for permission
-   * - 'auto': Automatically approve based on heuristics
+   * Prefer CLI-3 permission modes for new code:
+   * - 'interactive': ask before risky tool actions
+   * - 'unrestricted': allow tool actions without prompts
+   * - 'restricted': deny risky tool actions
+   * - 'external': delegate decisions to the configured external callback
+   *
+   * Legacy aliases such as 'default' and 'bypassPermissions' are still accepted
+   * for compatibility. Plan mode is separate; use setPlanMode instead.
    * 
    * @param mode - The permission mode to set
    * 
@@ -331,15 +620,62 @@ export class AutohandSDK {
    * 
    * @example
    * ```typescript
-   * await sdk.setPermissionMode('bypassPermissions');
+   * await sdk.setPermissionMode('interactive');
    * ```
    */
   async setPermissionMode(mode: SDKConfig['permissionMode']): Promise<void> {
     await this.ensureStarted();
-    await this.client.setPermissionMode(mode ?? 'default');
+    if (mode === 'plan') {
+      await this.client.setPlanMode(true);
+    } else {
+      await this.client.setPermissionMode(mode ?? 'default');
+    }
     if (mode !== undefined) {
       this.config.permissionMode = mode;
     }
+  }
+
+  /**
+   * Enable or disable CLI-3 plan mode for the current session.
+   *
+   * Plan mode is a separate execution guard, not a permission mode. When enabled,
+   * the CLI restricts the agent to read-only planning tools so it can inspect,
+   * reason, and produce an implementation plan before any write operation.
+   *
+   * @param enabled - Whether plan mode should be active
+   *
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * await sdk.setPlanMode(true);
+   * for await (const event of sdk.streamPrompt({ message: 'Plan this refactor' })) {
+   *   // Inspect the plan before disabling plan mode and executing.
+   * }
+   * ```
+   */
+  async setPlanMode(enabled: boolean): Promise<void> {
+    await this.ensureStarted();
+    await this.client.setPlanMode(enabled);
+    this.config.planMode = enabled;
+  }
+
+  /**
+   * Enable CLI-3 plan mode.
+   *
+   * @see setPlanMode
+   */
+  async enablePlanMode(): Promise<void> {
+    await this.setPlanMode(true);
+  }
+
+  /**
+   * Disable CLI-3 plan mode.
+   *
+   * @see setPlanMode
+   */
+  async disablePlanMode(): Promise<void> {
+    await this.setPlanMode(false);
   }
 
   /**
@@ -348,13 +684,13 @@ export class AutohandSDK {
    * Dynamically switches the model for the current session. This allows you to
    * use different models for different tasks without restarting the SDK.
    * 
-   * @param model - The model identifier (e.g., 'claude-sonnet-4-20250514')
+   * @param model - The model identifier (e.g., 'openrouter/auto')
    * 
    * @throws {Error} If the SDK is not started
    * 
    * @example
    * ```typescript
-   * await sdk.setModel('claude-opus-4-20250514');
+   * await sdk.setModel('openrouter/auto');
    * ```
    */
   async setModel(model?: string): Promise<void> {
@@ -784,24 +1120,74 @@ export class AutohandSDK {
    * 
    * @param params - Permission response parameters
    * @param params.requestId - The ID of the permission request
-   * @param params.decision - Whether to allow, deny, or provide an alternative
-   * @param params.allowed - Boolean approval (alternative to decision)
+   * @param params.decision - CLI-3 permission decision
+   * @param params.allowed - Boolean approval (legacy alternative to decision)
    * @param params.alternative - Alternative tool or command to run
-   * @param params.remember - Whether to remember this decision for future requests
+   * @param params.remember - Maps legacy allow/deny decisions to session scope
    * @throws {Error} If the SDK is not started
    * 
    * @example
    * ```typescript
    * await sdk.permissionResponse({
    *   requestId: 'req-123',
-   *   decision: 'allow',
-   *   remember: true
+   *   decision: 'allow_session'
    * });
    * ```
    */
   async permissionResponse(params: PermissionResponseParams): Promise<void> {
     await this.ensureStarted();
     await this.client.permissionResponse(params);
+  }
+
+  /**
+   * Allow a pending permission request.
+   *
+   * @param requestId - Permission request ID from a permission_request event
+   * @param scope - How long the decision should apply
+   *
+   * @example
+   * ```typescript
+   * await sdk.allowPermission(event.requestId, 'session');
+   * ```
+   */
+  async allowPermission(
+    requestId: string,
+    scope: PermissionDecisionScope = 'once'
+  ): Promise<void> {
+    await this.permissionResponse({
+      requestId,
+      decision: allowDecision(scope),
+    });
+  }
+
+  /**
+   * Deny a pending permission request.
+   *
+   * @param requestId - Permission request ID from a permission_request event
+   * @param scope - How long the decision should apply
+   */
+  async denyPermission(
+    requestId: string,
+    scope: PermissionDecisionScope = 'once'
+  ): Promise<void> {
+    await this.permissionResponse({
+      requestId,
+      decision: denyDecision(scope),
+    });
+  }
+
+  /**
+   * Respond to a permission request with a safer alternative action.
+   */
+  async suggestPermissionAlternative(
+    requestId: string,
+    alternative: string
+  ): Promise<void> {
+    await this.permissionResponse({
+      requestId,
+      decision: 'alternative',
+      alternative,
+    });
   }
 
   // ============================================================================
@@ -907,12 +1293,15 @@ export class AutohandSDK {
    * ```typescript
    * sdk.updateConfig({
    *   debug: true,
-   *   model: 'claude-opus-4-20250514'
+   *   model: 'openrouter/auto'
    * });
    * ```
    */
   updateConfig(config: Partial<SDKConfig>): void {
     this.config = { ...this.config, ...config };
+    if (!this.started) {
+      this.rebuildClient();
+    }
   }
 
   // ============================================================================
@@ -944,7 +1333,7 @@ export class AutohandSDK {
       totalCost: 0,
       totalTokens: 0,
       inputTokens: 0,
-      outhutTokens: 0,
+      outputTokens: 0,
       requestCount: state.messageCount ?? 0,
       duration: 0,
       toolCallCount: 0,
@@ -1035,6 +1424,149 @@ export class AutohandSDK {
   }
 
   // ============================================================================
+  // Hooks Management Methods
+  // ============================================================================
+
+  /**
+   * Get all hooks and settings
+   *
+   * Returns the current hooks configuration including all hook definitions
+   * and the global enabled status.
+   *
+   * @returns Hooks settings with all definitions
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * const hooks = await sdk.getHooks();
+   * console.log(`Hooks enabled: ${hooks.settings.enabled}`);
+   * console.log(`Total hooks: ${hooks.settings.hooks?.length ?? 0}`);
+   * ```
+   */
+  async getHooks(): Promise<GetHooksResult> {
+    await this.ensureStarted();
+    return this.client.getHooks();
+  }
+
+  /**
+   * Add a new hook
+   *
+   * Registers a new lifecycle hook that executes shell commands at specific
+   * events. Hooks receive context via environment variables and JSON stdin.
+   *
+   * @param hook - Hook definition to add
+   * @returns Result with success status and hook ID
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * await sdk.addHook({
+   *   event: 'pre-tool',
+   *   command: 'echo "About to run tool"',
+   *   description: 'Log before tool execution',
+   *   filter: { tool: ['write_file', 'edit_file'] }
+   * });
+   * ```
+   */
+  async addHook(hook: HookDefinition): Promise<AddHookResult> {
+    await this.ensureStarted();
+    return this.client.addHook({ hook });
+  }
+
+  /**
+   * Remove a hook by event and index
+   *
+   * Removes a hook from the configuration. Hooks are indexed within their
+   * event type (e.g., the 0th 'pre-tool' hook).
+   *
+   * @param event - The event type of the hook to remove
+   * @param index - The index of the hook within that event type
+   * @returns Result indicating success
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * await sdk.removeHook('pre-tool', 0);
+   * ```
+   */
+  async removeHook(event: HookEvent, index: number): Promise<RemoveHookResult> {
+    await this.ensureStarted();
+    return this.client.removeHook({ event, index });
+  }
+
+  /**
+   * Toggle a hook's enabled status
+   *
+   * Toggles a hook between enabled and disabled without removing it.
+   * Disabled hooks remain in the configuration but won't execute.
+   *
+   * @param event - The event type of the hook to toggle
+   * @param index - The index of the hook within that event type
+   * @returns Result with new enabled status
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.toggleHook('pre-tool', 0);
+   * console.log(`Hook is now ${result.enabled ? 'enabled' : 'disabled'}`);
+   * ```
+   */
+  async toggleHook(event: HookEvent, index: number): Promise<ToggleHookResult> {
+    await this.ensureStarted();
+    return this.client.toggleHook({ event, index });
+  }
+
+  /**
+   * Test a hook with sample context
+   *
+   * Executes a hook with a test context to verify it works correctly.
+   * Useful for debugging hook commands before adding them.
+   *
+   * @param hook - Hook definition to test
+   * @returns Execution result including stdout, stderr, and response
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.testHook({
+   *   event: 'pre-tool',
+   *   command: 'echo "Test"'
+   * });
+   * console.log(`Exit code: ${result.exitCode}`);
+   * console.log(`Stdout: ${result.stdout}`);
+   * ```
+   */
+  async testHook(hook: HookDefinition): Promise<TestHookResult> {
+    await this.ensureStarted();
+    return this.client.testHook({ hook });
+  }
+
+  /**
+   * Update hooks settings
+   *
+   * Updates the global hooks configuration including enabled status
+   * and hook definitions.
+   *
+   * @param settings - Partial hooks settings to update
+   * @throws {Error} If the SDK is not started
+   *
+   * @example
+   * ```typescript
+   * await sdk.setHooksSettings({
+   *   enabled: true,
+   *   hooks: [
+   *     { event: 'session-start', command: 'echo "Session started"' }
+   *   ]
+   * });
+   * ```
+   */
+  async setHooksSettings(settings: Partial<HooksSettings>): Promise<void> {
+    await this.ensureStarted();
+    await this.client.request('autohand.hooks.setSettings', { settings });
+    this.config.hooks = { ...this.config.hooks, ...settings };
+  }
+
+  // ============================================================================
   // AGENTS.md Methods
   // ============================================================================
 
@@ -1101,7 +1633,7 @@ export class AutohandSDK {
    */
   async setAgentsMdAsPrompt(source: string): Promise<void> {
     const content = await this.loadAgentsMd(source);
-    this.config.sysPrompt = content;
+    this.setSystemPrompt(content);
   }
 
   /**

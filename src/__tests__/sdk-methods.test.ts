@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { AutohandSDK } from '../index.js';
+import type { SDKEvent } from '../types/index.js';
 
 describe('SDK Stats Methods', () => {
   let sdk: AutohandSDK;
@@ -12,21 +13,13 @@ describe('SDK Stats Methods', () => {
   beforeEach(() => {
     sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
-      model: 'claude-sonnet-4-20250514',
+      model: 'openrouter/auto',
+      apiKey: 'test-key',
       debug: false,
     });
   });
 
   it('getStats returns session stats structure', async () => {
-    // Mock the ensureStarted and client.getState methods
-    const mockState = {
-      messageCount: 5,
-      sessionId: 'test-session-123',
-      model: 'claude-sonnet-4-20250514',
-      status: 'idle',
-      workspace: '/test/path',
-    };
-
     // Note: This is a structural test - in reality we'd need to mock the RPC client
     // For now, we verify the method exists and has the correct signature
     expect(sdk.getStats).toBeDefined();
@@ -46,22 +39,21 @@ describe('SDK Session Management Methods', () => {
   beforeEach(() => {
     sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
-      model: 'claude-sonnet-4-20250514',
+      model: 'openrouter/auto',
+      apiKey: 'test-key',
       debug: false,
     });
   });
 
   it('resumeSession sets session ID and resume flag', async () => {
-    const sessionId = 'session-abc-123';
-    
     // Verify the method exists and has the correct signature
     expect(sdk.resumeSession).toBeDefined();
     expect(typeof sdk.resumeSession).toBe('function');
     
     // Note: Full integration test would require mocking the transport layer
     // This verifies the method signature and basic behavior
-    expect(sdk.config.sessionId).toBeUndefined();
-    expect(sdk.config.resume).toBeUndefined();
+    expect(sdk.getConfig().sessionId).toBeUndefined();
+    expect(sdk.getConfig().resume).toBeUndefined();
   });
 
   it('resumeSession throws error if SDK is already started', async () => {
@@ -77,5 +69,56 @@ describe('SDK Session Management Methods', () => {
     // Verify the method exists and has the correct signature
     expect(sdk.saveSession).toBeDefined();
     expect(typeof sdk.saveSession).toBe('function');
+  });
+});
+
+describe('SDK Streaming Methods', () => {
+  it('propagates prompt failures from streamPrompt', async () => {
+    const sdk = new AutohandSDK({
+      cliPath: '/path/to/cli',
+      model: 'openrouter/auto',
+      apiKey: 'test-key',
+      debug: false,
+    });
+
+    (sdk as unknown as {
+      started: boolean;
+      client: {
+        prompt: () => Promise<void>;
+        events: () => AsyncGenerator<SDKEvent>;
+      };
+    }).started = true;
+
+    (sdk as unknown as {
+      client: {
+        prompt: () => Promise<void>;
+        events: () => AsyncGenerator<SDKEvent>;
+      };
+    }).client = {
+      prompt: async () => {
+        throw new Error('Request timeout: autohand.prompt');
+      },
+      events: async function* events(): AsyncGenerator<SDKEvent> {
+        await new Promise(() => undefined);
+        yield {
+          type: 'agent_end',
+          sessionId: 'unreachable',
+          reason: 'error',
+          timestamp: '2026-05-04T00:00:00.000Z',
+        };
+      },
+    };
+
+    try {
+      await sdk.streamPrompt({ message: 'hello' }).next();
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      if (error instanceof Error) {
+        expect(error.message).toBe('Request timeout: autohand.prompt');
+      }
+      return;
+    }
+
+    throw new Error('Expected streamPrompt to throw');
   });
 });

@@ -17,6 +17,9 @@ async function main() {
   // Test that the SDK has the new control methods
   const controlMethods = [
     'setPermissionMode',
+    'setPlanMode',
+    'enablePlanMode',
+    'disablePlanMode',
     'setModel',
     'setMaxThinkingTokens',
     'applyFlagSettings',
@@ -43,6 +46,7 @@ async function main() {
 
   const rpcMethods = [
     'setPermissionMode',
+    'setPlanMode',
     'setModel',
     'setMaxThinkingTokens',
     'applyFlagSettings',

@@ -14,17 +14,31 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "files": [
     "dist",
-    "cli"
+    "!dist/__tests__",
+    "cli",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "vitest",
-    "prepublishOnly": "npm run build"
+    "test": "bun test src/__tests__",
+    "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run lint"
   },
   "keywords": [
     "sdk",
@@ -42,7 +56,6 @@
     "typescript": "^5.0.0",
     "eslint": "^8.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "vitest": "^1.0.0"
+    "@typescript-eslint/parser": "^6.0.0"
   }
 }

@@ -1,6 +1,6 @@
 // Load config from file (supports JSON, TOML, YAML)
+import { AutohandSDK } from '../src/index.js';
 import {
-  AutohandSDK,
   loadConfigFrom,
   loadWorkspaceConfig,
   detectProviderFromModel,
@@ -74,12 +74,13 @@ async function main(): Promise<void> {
     };
 
     const sdk = new AutohandSDK({
+      cwd: '.',
       // CLI binary is auto-detected from bundled binaries based on platform/arch
       // For local development, override: cliPath: '/path/to/dev/autohand'
       autoMode: true,
       unrestricted: true,
       autoCommit: false,
-      sysPrompt: 'You are a helpful assistant.',
+      appendSystemPrompt: 'You are helping validate the TypeScript SDK public API.',
       model,
       // Provider is auto-detected from model ID, but can be explicitly set:
       // provider: 'zai',
@@ -145,8 +146,8 @@ async function main(): Promise<void> {
     await sdk.saveSession();
     console.log('✓ Session saved');
 
-    await sdk.close();
-    console.log('✓ SDK closed');
+    await sdk.stop();
+    console.log('✓ SDK stopped');
 
     // Demonstrate session resumption
     console.log('\n--- Session Resumption Demo ---');
@@ -169,8 +170,8 @@ async function main(): Promise<void> {
     }
     console.log('\n');
 
-    await resumedSdk.close();
-    console.log('✓ Resumed session closed');
+    await resumedSdk.stop();
+    console.log('✓ Resumed session stopped');
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

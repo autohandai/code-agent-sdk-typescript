@@ -26,11 +26,65 @@ npm install @autohand/agent-sdk
 
 ## Quick Start
 
+### High-Level API
+
+Use `Agent` for application code. It gives you an explicit run lifecycle while
+keeping CLI subprocess and JSON-RPC details out of your app.
+
+```typescript
+import { Agent } from '@autohand/agent-sdk';
+
+const agent = await Agent.create({
+  cwd: '.', // Optional: defaults to process.cwd()
+  instructions: 'Review code with Staff-level TypeScript judgement.',
+  permissionMode: 'interactive',
+});
+
+const run = await agent.send('Review this repository for release readiness');
+
+for await (const event of run.stream()) {
+  if (event.type === 'message_update') {
+    process.stdout.write(event.delta);
+  }
+}
+
+const result = await run.wait();
+console.log(result.text);
+
+await agent.close();
+```
+
+For simple one-shot tasks:
+
+```typescript
+const result = await agent.run('Summarize the API surface');
+```
+
+For JSON output:
+
+```typescript
+type ReleaseRisk = {
+  summary: string;
+  risks: Array<{ title: string; severity: 'low' | 'medium' | 'high' }>;
+};
+
+const risk = await agent.runJson<ReleaseRisk>('Assess publish readiness', {
+  schemaName: 'ReleaseRisk',
+  schema: {
+    summary: 'string',
+    risks: [{ title: 'string', severity: 'low | medium | high' }],
+  },
+  validate: (value) => value as ReleaseRisk,
+});
+```
+
+### Low-Level API
+
 ```typescript
 import { AutohandSDK } from '@autohand/agent-sdk';
 
 const sdk = new AutohandSDK({
-  cwd: process.cwd(),
+  cwd: '.', // Optional: defaults to process.cwd()
   debug: true,
 });
 
@@ -57,7 +111,7 @@ await sdk.stop();
 
 ```typescript
 const sdk = new AutohandSDK({
-  cwd: process.cwd(),           // Working directory
+  cwd: '.',                    // Working directory. Omit to use process.cwd()
   cliPath: '/path/to/cli',     // Optional: custom CLI path
   debug: true,                 // Enable debug logging
   timeout: 30000,              // Request timeout in ms
@@ -73,7 +127,7 @@ The SDK uses the CLI's configuration file (`~/.autohand/config.json`). You can c
   "provider": "openrouter",
   "openrouter": {
     "apiKey": "sk-or-...",
-    "model": "anthropic/claude-sonnet-4-20250514"
+    "model": "openrouter/auto"
   }
 }
 ```
@@ -81,6 +135,61 @@ The SDK uses the CLI's configuration file (`~/.autohand/config.json`). You can c
 ## API Reference
 
 ### AutohandSDK
+
+#### `Agent.create(options: AgentOptions): Promise<Agent>`
+
+Create and start a high-level agent session.
+
+```typescript
+const agent = await Agent.create({
+  cwd: '.',
+  instructions: 'Prefer Bun commands and typed SDK APIs.',
+});
+```
+
+#### `agent.send(input, options?): Promise<Run>`
+
+Create a run without waiting for it to finish.
+
+```typescript
+const run = await agent.send('Add tests for permission decisions');
+
+for await (const event of run.stream()) {
+  console.log(event.type);
+}
+
+const result = await run.wait();
+```
+
+#### `agent.run(input, options?): Promise<RunResult>`
+
+Run a prompt to completion.
+
+```typescript
+const result = await agent.run('Summarize release risk');
+console.log(result.text);
+```
+
+#### `agent.runJson<T>(input, options?): Promise<T>`
+
+Ask the agent for JSON, parse the final response, and optionally validate it.
+Pass `schema.parse` from Zod or any `(value: unknown) => T` validator.
+
+```typescript
+const result = await agent.runJson<{ files: string[] }>('List changed files', {
+  schema: { files: ['string'] },
+  validate: (value) => value as { files: string[] },
+});
+```
+
+#### `run.json<T>(options?): Promise<T>`
+
+Parse a completed run result as JSON.
+
+```typescript
+const run = await agent.send('Return {"ok": true}');
+const data = await run.json<{ ok: boolean }>();
+```
 
 #### `constructor(config: SDKConfig)`
 
@@ -139,6 +248,26 @@ Get conversation messages.
 const messages = await sdk.getMessages({ limit: 10 });
 ```
 
+#### `setSystemPrompt(promptOrPath: string): AutohandSDK`
+
+Replace the entire CLI system prompt before the session starts. The value can be
+inline text or a file path, matching `autohand --sys-prompt`.
+
+```typescript
+const sdk = new AutohandSDK({ cwd: '.' })
+  .setSystemPrompt('./SYSTEM_PROMPT.md');
+```
+
+#### `appendSystemPrompt(promptOrPath: string): AutohandSDK`
+
+Append instructions to the default CLI system prompt before the session starts.
+This is the recommended option for most SDK integrations.
+
+```typescript
+const sdk = new AutohandSDK()
+  .appendSystemPrompt('Always run Bun checks before summarizing release readiness.');
+```
+
 #### `permissionResponse(params: PermissionResponseParams): Promise<void>`
 
 Respond to a permission request.
@@ -146,9 +275,30 @@ Respond to a permission request.
 ```typescript
 await sdk.permissionResponse({
   requestId: 'req-123',
-  decision: 'allow',
-  remember: false,
+  decision: 'allow_session',
 });
+```
+
+Prefer the ergonomic helpers for application code:
+
+```typescript
+await sdk.allowPermission('req-123', 'session');
+await sdk.denyPermission('req-456', 'once');
+await sdk.suggestPermissionAlternative('req-789', 'Run bun run typecheck first');
+```
+
+#### `setPlanMode(enabled: boolean): Promise<void>`
+
+Enable or disable CLI-3 plan mode. Plan mode is separate from permission mode:
+it restricts the agent to read-only planning tools until the host disables plan
+mode or the plan is accepted by the CLI flow.
+
+```typescript
+const sdk = new AutohandSDK({ planMode: true });
+await sdk.start();
+
+await sdk.disablePlanMode();
+await sdk.enablePlanMode();
 ```
 
 #### `events(): AsyncGenerator<SDKEvent>`
@@ -185,6 +335,14 @@ See the `examples/` directory for more examples:
 - `basic-usage.ts` - Basic prompt usage
 - `streaming.ts` - Streaming events
 - `permission-handling.ts` - Handling permission requests
+- `20-sdlc-discovery-plan.ts` - Read-only SDLC discovery and planning
+- `21-sdlc-gated-implementation.ts` - Plan first, execute after an explicit gate
+- `22-sdlc-release-readiness.ts` - Release-readiness checks with event streaming
+- `23-system-prompts.ts` - Replacing or appending the CLI system prompt
+- `24-high-level-agent.ts` - Recommended Agent/Run API
+- `25-structured-json.ts` - JSON output with optional validation
+
+See also [SDLC workflows](./docs/sdlc-workflows.md).
 
 ## CLI Binaries
 

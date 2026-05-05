@@ -37,7 +37,56 @@ export type JsonRpcParams = Record<string, unknown> | unknown[];
 /**
  * Available providers in CLI-3
  */
-export type ProviderName = 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai';
+export type ProviderName = 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
+
+/**
+ * AUTOHAND_ prefixed environment variables supported by CLI-3.
+ * These are forwarded to the CLI subprocess when spawning.
+ */
+export interface AutohandEnvVars {
+  /** Base directory for all Autohand user data and configuration (default: ~/.autohand) */
+  AUTOHAND_HOME?: string;
+  /** API base URL for authentication and sync services */
+  AUTOHAND_API_URL?: string;
+  /** Config file path override */
+  AUTOHAND_CONFIG?: string;
+  /** Enable debug logging mode ('1' to enable) */
+  AUTOHAND_DEBUG?: string;
+  /** Client identifier for ACP extensions (e.g., 'zed', 'terminal') */
+  AUTOHAND_CLIENT_NAME?: string;
+  /** Client version string */
+  AUTOHAND_CLIENT_VERSION?: string;
+  /** Auth code for headless setup */
+  AUTOHAND_CODE?: string;
+  /** Display language locale override */
+  AUTOHAND_LOCALE?: string;
+  /** Suppress startup banner ('1' to suppress) */
+  AUTOHAND_NO_BANNER?: string;
+  /** Force non-interactive mode ('1' to enable) */
+  AUTOHAND_NON_INTERACTIVE?: string;
+  /** Permission callback timeout in milliseconds */
+  AUTOHAND_PERMISSION_CALLBACK_TIMEOUT?: string;
+  /** Permission callback URL for external approval */
+  AUTOHAND_PERMISSION_CALLBACK_URL?: string;
+  /** Company/enterprise secret for team features */
+  AUTOHAND_SECRET?: string;
+  /** Share API URL override */
+  AUTOHAND_SHARE_URL?: string;
+  /** Skip telemetry ping on startup ('1' to skip) */
+  AUTOHAND_SKIP_PING?: string;
+  /** Skip version check on startup ('1' to skip) */
+  AUTOHAND_SKIP_UPDATE_CHECK?: string;
+  /** Stream tool output in real-time ('1' to enable) */
+  AUTOHAND_STREAM_TOOL_OUTPUT?: string;
+  /** Disable terminal regions for box drawing ('0' to disable) */
+  AUTOHAND_TERMINAL_REGIONS?: string;
+  /** Default thinking level (low, medium, high) */
+  AUTOHAND_THINKING_LEVEL?: string;
+  /** TMUX session indicator ('1' when launched from tmux) */
+  AUTOHAND_TMUX_LAUNCHED?: string;
+  /** Auto-confirm prompts without user interaction ('1' to enable) */
+  AUTOHAND_YES?: string;
+}
 
 /**
  * Validation error for provider-specific options
@@ -65,6 +114,11 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'zai':
     case 'openrouter':
     case 'llmgateway':
+    case 'xai':
+    case 'cerebras':
+    case 'deepseek':
+    case 'vertexai':
+    case 'nvidia':
       validateCloudProviderConfig(provider, config);
       break;
     case 'ollama':
@@ -82,24 +136,29 @@ function validateOpenAIConfig(config: SDKConfig): void {
     );
   }
 
-  if (config.reasoningEffort && !['low', 'medium', 'high'].includes(config.reasoningEffort)) {
+  if (config.reasoningEffort !== undefined && !['low', 'medium', 'high'].includes(config.reasoningEffort)) {
     throw new ProviderConfigError(
       `Invalid reasoningEffort: ${config.reasoningEffort}. Must be 'low', 'medium', or 'high'`
     );
   }
 
   if (config.openaiAuthMode === 'chatgpt') {
-    if (!config.chatgptAccessToken) {
+    if (config.chatgptAccessToken === undefined || config.chatgptAccessToken === '') {
       throw new ProviderConfigError('chatgptAccessToken is required when openaiAuthMode is chatgpt');
     }
-    if (!config.chatgptAccountId) {
+    if (config.chatgptAccountId === undefined || config.chatgptAccountId === '') {
       throw new ProviderConfigError('chatgptAccountId is required when openaiAuthMode is chatgpt');
+    }
+  } else {
+    // api-key mode (default) requires an apiKey
+    if (config.apiKey === undefined || config.apiKey === '') {
+      throw new ProviderConfigError("apiKey is required for provider 'openai'");
     }
   }
 }
 
 function validateAzureConfig(config: SDKConfig): void {
-  if (config.azureAuthMethod && !['api-key', 'entra-id', 'managed-identity'].includes(config.azureAuthMethod)) {
+  if (config.azureAuthMethod !== undefined && !['api-key', 'entra-id', 'managed-identity'].includes(config.azureAuthMethod)) {
     throw new ProviderConfigError(
       `Invalid azureAuthMethod: ${config.azureAuthMethod}. Must be 'api-key', 'entra-id', or 'managed-identity'`
     );
@@ -108,38 +167,36 @@ function validateAzureConfig(config: SDKConfig): void {
   const authMethod = config.azureAuthMethod ?? 'api-key';
 
   if (authMethod === 'entra-id') {
-    if (!config.azureTenantId) {
+    if (config.azureTenantId === undefined || config.azureTenantId === '') {
       throw new ProviderConfigError('azureTenantId is required when azureAuthMethod is entra-id');
     }
-    if (!config.azureClientId) {
+    if (config.azureClientId === undefined || config.azureClientId === '') {
       throw new ProviderConfigError('azureClientId is required when azureAuthMethod is entra-id');
     }
-    if (!config.azureClientSecret) {
+    if (config.azureClientSecret === undefined || config.azureClientSecret === '') {
       throw new ProviderConfigError('azureClientSecret is required when azureAuthMethod is entra-id');
     }
   }
 
-  if (authMethod === 'api-key' && !config.apiKey) {
+  if (authMethod === 'api-key' && (config.apiKey === undefined || config.apiKey === '')) {
     throw new ProviderConfigError('apiKey is required when azureAuthMethod is api-key');
   }
 }
 
 function validateCloudProviderConfig(provider: ProviderName, config: SDKConfig): void {
-  if (!config.apiKey) {
-    console.warn(`Warning: apiKey not provided for ${provider}. The CLI may fail to authenticate.`);
+  if (config.apiKey === undefined || config.apiKey === '') {
+    throw new ProviderConfigError(`apiKey is required for provider '${provider}'`);
   }
 }
 
 function validateLocalProviderConfig(provider: ProviderName, config: SDKConfig): void {
-  if (config.port && (config.port < 1 || config.port > 65535)) {
+  if (config.port !== undefined && (config.port < 1 || config.port > 65535)) {
     throw new ProviderConfigError(
       `Invalid port: ${config.port}. Must be between 1 and 65535`
     );
   }
 
-  if (!config.baseUrl && provider === 'llamacpp') {
-    console.warn(`Warning: baseUrl not provided for ${provider}. Using default http://localhost:${config.port ?? 80}`);
-  }
+  void provider;
 }
 
 /**
@@ -176,6 +233,31 @@ export function detectProviderFromModel(model: string): ProviderName {
     return 'azure';
   }
 
+  // xAI models (Grok)
+  if (modelLower.includes('grok')) {
+    return 'xai';
+  }
+
+  // DeepSeek models
+  if (modelLower.includes('deepseek')) {
+    return 'deepseek';
+  }
+
+  // Vertex AI models
+  if (modelLower.includes('gemini') || modelLower.includes('vertex')) {
+    return 'vertexai';
+  }
+
+  // NVIDIA models
+  if (modelLower.includes('nvidia')) {
+    return 'nvidia';
+  }
+
+  // Cerebras models
+  if (modelLower.includes('cerebras')) {
+    return 'cerebras';
+  }
+
   // Local providers - default to ollama for common local model names
   if (modelLower.includes('llama') || modelLower.includes('mistral') || modelLower.includes('codellama')) {
     return 'ollama';
@@ -193,6 +275,46 @@ export function detectProviderFromModel(model: string): ProviderName {
  * Permission modes matching CLI-3
  */
 export type PermissionMode = 'interactive' | 'unrestricted' | 'restricted' | 'external';
+
+/**
+ * Legacy permission mode aliases accepted by older SDK call sites.
+ *
+ * New code should prefer PermissionMode for session policy and planMode for
+ * planning-only execution.
+ */
+export type LegacyPermissionMode =
+  | 'default'
+  | 'acceptEdits'
+  | 'bypassPermissions'
+  | 'plan'
+  | 'dontAsk'
+  | 'auto'
+  | 'ask'
+  | 'yolo';
+
+/**
+ * CLI-3 permission prompt decisions.
+ */
+export type PermissionDecision =
+  | 'allow_once'
+  | 'deny_once'
+  | 'allow_session'
+  | 'deny_session'
+  | 'allow_always_project'
+  | 'allow_always_user'
+  | 'deny_always_project'
+  | 'deny_always_user'
+  | 'alternative';
+
+/**
+ * Compatibility aliases accepted by the SDK and normalized before RPC.
+ */
+export type PermissionDecisionAlias = 'allow' | 'deny';
+
+/**
+ * Persistence scope for ergonomic permission helpers.
+ */
+export type PermissionDecisionScope = 'once' | 'session' | 'project' | 'user';
 
 /**
  * Permission rule for fine-grained control
@@ -288,12 +410,64 @@ export interface SkillDefinition extends SkillFrontmatter {
 export interface SkillSettings {
   /** Enable automatic skill selection */
   autoSkill?: boolean;
-  /** Specific skills to load (by name) */
-  skills?: string[];
+  /** Specific skills to load (by name or file path) */
+  skills?: SkillReference[];
   /** Skill sources to search */
   sources?: SkillSource[];
   /** Whether to install missing skills from community */
   installMissing?: boolean;
+}
+
+/**
+ * Skill reference - either a skill name or a file path to a SKILL.md file.
+ *
+ * When a file path is detected (contains '/' or ends with '.md'), the SDK
+ * copies the skill file to ~/.autohand/skills/ before starting the CLI.
+ */
+export type SkillReference =
+  | string // Skill name or file path (auto-detected)
+  | { name: string; path: string; scope?: 'user' | 'project' }; // Explicit skill with name and path
+
+/**
+ * Helper to detect if a skill reference is a file path
+ */
+export function isSkillFilePath(ref: SkillReference): ref is string {
+  if (typeof ref === 'string') {
+    return ref.includes('/') || ref.endsWith('.md');
+  }
+  return false;
+}
+
+/**
+ * Extract skill name from a reference
+ */
+export function getSkillName(ref: SkillReference): string {
+  if (typeof ref === 'string') {
+    // For file paths, use directory name or basename without extension
+    if (isSkillFilePath(ref)) {
+      const parts = ref.split(/[\\/]/).filter(Boolean);
+      const lastPart = parts[parts.length - 1];
+      if (lastPart?.toLowerCase() === 'skill.md' && parts.length > 1) {
+        return parts[parts.length - 2] ?? 'custom-skill';
+      }
+      return lastPart?.replace(/\.md$/i, '') ?? 'custom-skill';
+    }
+    return ref;
+  }
+  return ref.name;
+}
+
+/**
+ * Extract file path from a reference (if applicable)
+ */
+export function getSkillPath(ref: SkillReference): string | undefined {
+  if (typeof ref === 'string' && isSkillFilePath(ref)) {
+    return ref;
+  }
+  if (typeof ref === 'object') {
+    return ref.path;
+  }
+  return undefined;
 }
 
 // ============================================================================
@@ -320,6 +494,8 @@ export interface ContextUsage {
 export interface ContextSettings {
   /** Enable context compaction */
   contextCompact?: boolean;
+  /** Alias for compressionThreshold retained for config ergonomics */
+  compactThreshold?: number;
   /** Maximum context window in tokens */
   maxTokens?: number;
   /** Threshold for starting compression (0-1) */
@@ -347,7 +523,7 @@ export interface SessionStats {
   /** Input tokens used */
   inputTokens: number;
   /** Output tokens used */
-  outhutTokens: number;
+  outputTokens: number;
   /** Number of requests made */
   requestCount: number;
   /** Session duration in seconds */
@@ -397,6 +573,8 @@ export interface SessionMetadata {
 export interface SessionSettings {
   /** Persist session to disk */
   persistSession?: boolean;
+  /** Alias for persistSession */
+  persist?: boolean;
   /** Session ID to resume */
   sessionId?: string;
   /** Resume from last session */
@@ -419,8 +597,12 @@ export interface SessionSettings {
 export interface AgentsMdSettings {
   /** Enable AGENTS.md usage */
   enable?: boolean;
+  /** Alias for enable */
+  enabled?: boolean;
   /** Create AGENTS.md if it doesn't exist */
   create?: boolean;
+  /** Alias for create */
+  createDefault?: boolean;
   /** Path to AGENTS.md (supports relative path, file:///, https://) */
   path?: string;
   /** Auto-update AGENTS.md with discovered patterns */
@@ -594,7 +776,6 @@ export async function loadConfigFrom(configPath: string): Promise<SDKConfig> {
       case 'yaml':
       case 'yml':
         try {
-          // @ts-expect-error - yaml package is optional
           const yaml = await import('yaml');
           config = yaml.parse(content) as SDKConfig;
         } catch (e) {
@@ -636,8 +817,8 @@ export async function loadWorkspaceConfig(workspaceRoot?: string): Promise<SDKCo
   if (fs.existsSync(globalConfigPath)) {
     try {
       globalConfig = await loadConfigFrom(globalConfigPath);
-    } catch (error) {
-      console.warn(`Failed to load global config from ${globalConfigPath}:`, error);
+    } catch {
+      globalConfig = {};
     }
   }
   
@@ -645,8 +826,8 @@ export async function loadWorkspaceConfig(workspaceRoot?: string): Promise<SDKCo
   if (fs.existsSync(workspaceConfigPath)) {
     try {
       workspaceConfig = await loadConfigFrom(workspaceConfigPath);
-    } catch (error) {
-      console.warn(`Failed to load workspace config from ${workspaceConfigPath}:`, error);
+    } catch {
+      workspaceConfig = {};
     }
   }
   
@@ -662,35 +843,43 @@ export async function loadWorkspaceConfig(workspaceRoot?: string): Promise<SDKCo
  */
 function mergeEnvVariables(config: SDKConfig): SDKConfig {
   const merged = { ...config };
+  const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const azureApiKey = process.env.AZURE_API_KEY;
+  const zaiApiKey = process.env.ZAI_API_KEY;
+  const azureTenantId = process.env.AZURE_TENANT_ID;
+  const azureClientId = process.env.AZURE_CLIENT_ID;
+  const azureClientSecret = process.env.AZURE_CLIENT_SECRET;
+  const autohandModel = process.env.AUTOHAND_MODEL;
   
   // Provider-specific environment variables
-  if (process.env.OPENROUTER_API_KEY && !merged.apiKey) {
-    merged.apiKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterApiKey !== undefined && openrouterApiKey !== '' && merged.apiKey === undefined) {
+    merged.apiKey = openrouterApiKey;
   }
-  if (process.env.OPENAI_API_KEY && !merged.apiKey) {
-    merged.apiKey = process.env.OPENAI_API_KEY;
+  if (openaiApiKey !== undefined && openaiApiKey !== '' && merged.apiKey === undefined) {
+    merged.apiKey = openaiApiKey;
   }
-  if (process.env.AZURE_API_KEY && !merged.apiKey) {
-    merged.apiKey = process.env.AZURE_API_KEY;
+  if (azureApiKey !== undefined && azureApiKey !== '' && merged.apiKey === undefined) {
+    merged.apiKey = azureApiKey;
   }
-  if (process.env.ZAI_API_KEY && !merged.apiKey) {
-    merged.apiKey = process.env.ZAI_API_KEY;
+  if (zaiApiKey !== undefined && zaiApiKey !== '' && merged.apiKey === undefined) {
+    merged.apiKey = zaiApiKey;
   }
   
   // Azure-specific environment variables
-  if (process.env.AZURE_TENANT_ID && !merged.azureTenantId) {
-    merged.azureTenantId = process.env.AZURE_TENANT_ID;
+  if (azureTenantId !== undefined && azureTenantId !== '' && merged.azureTenantId === undefined) {
+    merged.azureTenantId = azureTenantId;
   }
-  if (process.env.AZURE_CLIENT_ID && !merged.azureClientId) {
-    merged.azureClientId = process.env.AZURE_CLIENT_ID;
+  if (azureClientId !== undefined && azureClientId !== '' && merged.azureClientId === undefined) {
+    merged.azureClientId = azureClientId;
   }
-  if (process.env.AZURE_CLIENT_SECRET && !merged.azureClientSecret) {
-    merged.azureClientSecret = process.env.AZURE_CLIENT_SECRET;
+  if (azureClientSecret !== undefined && azureClientSecret !== '' && merged.azureClientSecret === undefined) {
+    merged.azureClientSecret = azureClientSecret;
   }
   
   // Model from environment
-  if (process.env.AUTOHAND_MODEL && !merged.model) {
-    merged.model = process.env.AUTOHAND_MODEL;
+  if (autohandModel !== undefined && autohandModel !== '' && merged.model === undefined) {
+    merged.model = autohandModel;
   }
   
   return merged;
@@ -761,7 +950,7 @@ export async function loadAgentsMd(source: string): Promise<string> {
  * @returns The default AGENTS.md content
  */
 export function createDefaultAgentsMd(projectName?: string): string {
-  return `# Project Autopilot${projectName ? ` - ${projectName}` : ''}
+  return `# Project Autopilot${projectName !== undefined && projectName !== '' ? ` - ${projectName}` : ''}
 
 This file helps AI assistants understand your project structure, conventions, and workflows.
 
@@ -860,8 +1049,8 @@ export interface SDKConfig {
   // ============================================================================
   // Permission Configuration
   // ============================================================================
-  /** Legacy permission mode (for backward compatibility) */
-  permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto';
+  /** Permission mode for the session. Prefer CLI-3 modes for new code. */
+  permissionMode?: PermissionMode | LegacyPermissionMode;
   /** Full permission settings (CLI-3 compatible) */
   permissions?: PermissionSettings;
   /** Auto-approve tools matching pattern (e.g., "allow:read,write" or "deny:delete") */
@@ -870,6 +1059,8 @@ export interface SDKConfig {
   yolo?: string;
   /** Timeout for auto-approve mode in seconds */
   yoloTimeout?: number;
+  /** Enable CLI-3 plan mode after the RPC session starts */
+  planMode?: boolean;
 
   // ============================================================================
   // Execution Mode Configuration
@@ -891,7 +1082,9 @@ export interface SDKConfig {
   // Skills Configuration
   // ============================================================================
   /** Skill settings */
-  skills?: SkillSettings;
+  skills?: SkillSettings | SkillReference[];
+  /** Direct skill references (convenience - can use instead of skills.skills) */
+  skillRefs?: SkillReference[];
   /** Enable auto-skill for automatic skill selection (legacy, use skills.autoSkill) */
   autoSkill?: boolean;
 
@@ -908,8 +1101,12 @@ export interface SDKConfig {
   // ============================================================================
   /** System prompt (inline string or file path) */
   sysPrompt?: string;
+  /** Alias for sysPrompt */
+  systemPrompt?: string;
   /** Append to system prompt (inline string or file path) */
   appendSysPrompt?: string;
+  /** Alias for appendSysPrompt */
+  appendSystemPrompt?: string;
 
   // ============================================================================
   // Session Configuration
@@ -936,6 +1133,8 @@ export interface SDKConfig {
   // ============================================================================
   /** Environment variables to pass to CLI */
   env?: Record<string, string>;
+  /** AUTOHAND_ prefixed environment variables forwarded to the CLI subprocess */
+  envVars?: AutohandEnvVars;
 
   // ============================================================================
   // Thinking Configuration
@@ -993,8 +1192,8 @@ export interface SDKConfig {
   // ============================================================================
   // Hooks Configuration
   // ============================================================================
-  /** Hook functions */
-  hooks?: Record<string, HookFunction>;
+  /** Hooks settings matching CLI-3 HookManager */
+  hooks?: HooksSettings;
   /** Elicitation callback for user input from MCP servers */
   onElicitation?: (params: unknown) => unknown;
 
@@ -1084,9 +1283,23 @@ export interface PromptParams {
       endLine: number;
       text: string;
     };
+    agentsMd?: {
+      content?: string;
+      path?: string;
+      auto?: true;
+    };
   };
   images?: ImageAttachment[];
   thinkingLevel?: 'none' | 'normal' | 'extended';
+  /**
+   * AGENTS.md content or path to inject into the prompt context.
+   * Can be:
+   * - Raw content string to use as AGENTS.md
+   * - File path (absolute or relative) to load AGENTS.md from
+   * - URL (https://) to fetch AGENTS.md from
+   * - "auto" to automatically detect from workspace
+   */
+  agentsMd?: string | { path?: string; content?: string; auto?: boolean };
 }
 
 export interface ImageAttachment {
@@ -1109,7 +1322,7 @@ export interface GetMessagesParams {
 
 export interface PermissionResponseParams {
   requestId: string;
-  decision?: 'allow' | 'deny' | 'alternative';
+  decision?: PermissionDecision | PermissionDecisionAlias;
   allowed?: boolean;
   alternative?: string;
   remember?: boolean;
@@ -1124,6 +1337,10 @@ export interface PromptResult {
 }
 
 export interface AbortResult {
+  success: boolean;
+}
+
+export interface PlanModeSetResult {
   success: boolean;
 }
 
@@ -1263,6 +1480,7 @@ export type SDKEvent =
   | ToolStartEvent
   | ToolUpdateEvent
   | ToolEndEvent
+  | FileModifiedEvent
   | PermissionRequestEvent
   | ErrorEvent;
 
@@ -1344,6 +1562,14 @@ export interface ToolEndEvent {
   timestamp: string;
 }
 
+export interface FileModifiedEvent {
+  type: 'file_modified';
+  filePath: string;
+  changeType: 'create' | 'modify' | 'delete';
+  toolId: string;
+  timestamp: string;
+}
+
 export interface PermissionRequestEvent {
   type: 'permission_request';
   requestId: string;
@@ -1378,6 +1604,234 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   headers?: Record<string, string>;
   autoConnect?: boolean;
+}
+
+// ============================================================================
+// Hooks Types (matching CLI-3 HookManager)
+// ============================================================================
+
+/** All available hook events in the CLI */
+export type HookEvent =
+  | 'session-start'
+  | 'session-end'
+  | 'pre-clear'
+  | 'pre-prompt'
+  | 'pre-tool'
+  | 'post-tool'
+  | 'file-modified'
+  | 'stop'
+  | 'subagent-stop'
+  | 'permission-request'
+  | 'notification'
+  | 'session-error'
+  // Auto-mode events
+  | 'automode:start'
+  | 'automode:iteration'
+  | 'automode:checkpoint'
+  | 'automode:pause'
+  | 'automode:resume'
+  | 'automode:cancel'
+  | 'automode:complete'
+  | 'automode:error'
+  // Learn events
+  | 'pre-learn'
+  | 'post-learn'
+  // Team events
+  | 'team-created'
+  | 'teammate-spawned'
+  | 'teammate-idle'
+  | 'task-assigned'
+  | 'task-completed'
+  | 'team-shutdown'
+  // Review events
+  | 'review:start'
+  | 'review:end'
+  | 'review:paused'
+  | 'review:failed'
+  | 'review:completed'
+  // Mode events
+  | 'mode-change'
+  // Context lifecycle events
+  | 'context:compact'
+  | 'context:overflow'
+  | 'context:warning'
+  | 'context:critical';
+
+/** Filter to limit when a hook fires */
+export interface HookFilter {
+  /** Only fire for specific tools (e.g., ["run_command", "write_file"]) */
+  tool?: string[];
+  /** Only fire for specific file paths (glob patterns like "src/*.ts") */
+  path?: string[];
+}
+
+/** Hook definition for config-based hooks */
+export interface HookDefinition {
+  /** Event to hook into */
+  event: HookEvent;
+  /** Shell command to execute (receives context via env vars and JSON via stdin) */
+  command: string;
+  /** Description for hooks display */
+  description?: string;
+  /** Whether hook is enabled (default: true) */
+  enabled?: boolean;
+  /** Timeout in ms (default: 5000) */
+  timeout?: number;
+  /** Run async without blocking (default: false) */
+  async?: boolean;
+  /** Regex pattern to match tool names, notification types, session types, etc. */
+  matcher?: string;
+  /** Filter to specific tools or paths */
+  filter?: HookFilter;
+}
+
+/** Hooks configuration settings */
+export interface HooksSettings {
+  /** Enable/disable hooks globally (default: true) */
+  enabled?: boolean;
+  /** Registered hook definitions */
+  hooks?: HookDefinition[];
+}
+
+/** Hook response for control flow decisions (parsed from stdout JSON) */
+export interface HookResponse {
+  /** Decision for tool/permission hooks: allow, deny, ask, or block */
+  decision?: 'allow' | 'deny' | 'ask' | 'block';
+  /** Reason for decision (shown to agent or user) */
+  reason?: string;
+  /** Whether to continue execution (false stops the agent) */
+  continue?: boolean;
+  /** Message shown when continue is false */
+  stopReason?: string;
+  /** Modified tool input (for pre-tool/permission-request hooks) */
+  updatedInput?: Record<string, unknown>;
+  /** Additional context to add to conversation */
+  additionalContext?: string;
+}
+
+/** Context passed to hooks via environment variables and JSON stdin */
+export interface HookContext {
+  /** Event that triggered the hook */
+  event: HookEvent;
+  /** Workspace root path */
+  workspace: string;
+  /** Session ID */
+  sessionId?: string;
+  /** Tool name (for tool events) */
+  tool?: string;
+  /** Tool call ID */
+  toolCallId?: string;
+  /** JSON-encoded tool args */
+  args?: Record<string, unknown>;
+  /** Tool success status (for post-tool) */
+  success?: boolean;
+  /** Tool output (for post-tool) */
+  output?: string;
+  /** Duration in ms (for post-tool, stop, session-end) */
+  duration?: number;
+  /** File path (for file-modified) */
+  path?: string;
+  /** Change type (for file-modified) */
+  changeType?: 'create' | 'modify' | 'delete';
+  /** User instruction (for pre-prompt) */
+  instruction?: string;
+  /** Mentioned files (for pre-prompt) */
+  mentionedFiles?: string[];
+  /** Tokens used (for stop) */
+  tokensUsed?: number;
+  /** Tool calls count (for stop) */
+  toolCallsCount?: number;
+  /** Error message (for session-error) */
+  error?: string;
+  /** Error code (for session-error) */
+  errorCode?: string;
+  /** Session type for session-start (startup, resume, clear) */
+  sessionType?: 'startup' | 'resume' | 'clear';
+  /** Session end reason */
+  sessionEndReason?: 'quit' | 'clear' | 'exit' | 'error';
+  /** Subagent task ID (for subagent-stop) */
+  subagentId?: string;
+  /** Subagent name (for subagent-stop) */
+  subagentName?: string;
+  /** Subagent type (for subagent-stop) */
+  subagentType?: string;
+  /** Subagent success status (for subagent-stop) */
+  subagentSuccess?: boolean;
+  /** Subagent error message (for subagent-stop) */
+  subagentError?: string;
+  /** Subagent duration ms (for subagent-stop) */
+  subagentDuration?: number;
+  /** Permission type (for permission-request) */
+  permissionType?: string;
+  /** Notification type (for notification) */
+  notificationType?: string;
+  /** Notification message (for notification) */
+  notificationMessage?: string;
+}
+
+/** Result of hook execution */
+export interface HookExecutionResult {
+  hook: HookDefinition;
+  success: boolean;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+  duration: number;
+  /** Exit code from the process */
+  exitCode?: number;
+  /** Whether this was a blocking error (exit code 2) */
+  blockingError?: boolean;
+  /** Parsed JSON response from stdout (for control flow) */
+  response?: HookResponse;
+}
+
+/** Parameters for adding a hook */
+export interface AddHookParams {
+  hook: HookDefinition;
+}
+
+/** Parameters for removing a hook */
+export interface RemoveHookParams {
+  event: HookEvent;
+  index: number;
+}
+
+/** Parameters for toggling a hook */
+export interface ToggleHookParams {
+  event: HookEvent;
+  index: number;
+}
+
+/** Parameters for testing a hook */
+export interface TestHookParams {
+  hook: HookDefinition;
+}
+
+/** Result of getting hooks */
+export interface GetHooksResult {
+  settings: HooksSettings;
+}
+
+/** Result of adding a hook */
+export interface AddHookResult {
+  success: boolean;
+  hookId?: string;
+}
+
+/** Result of removing a hook */
+export interface RemoveHookResult {
+  success: boolean;
+}
+
+/** Result of toggling a hook */
+export interface ToggleHookResult {
+  success: boolean;
+  enabled: boolean;
+}
+
+/** Result of testing a hook */
+export interface TestHookResult extends HookExecutionResult {
+  testMode: boolean;
 }
 
 export type HookFunction = (params: unknown) => HookResult | Promise<HookResult>;

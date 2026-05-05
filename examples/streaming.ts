@@ -39,6 +39,10 @@ async function main() {
           break;
         case 'tool_end':
           console.log(`[Tool] ${event.toolName} completed: ${event.success ? 'success' : 'failed'}`);
+          if (event.output) {
+            console.log('  Output:', event.output.substring(0, 500));
+            if (event.output.length > 500) console.log('  ... (truncated)');
+          }
           break;
         case 'agent_end':
           console.log(`[Agent] Ended: ${event.reason}`);

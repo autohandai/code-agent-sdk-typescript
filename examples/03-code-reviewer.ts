@@ -41,8 +41,16 @@ async function main(): Promise<void> {
     for await (const event of sdk.streamPrompt({ message: prompt })) {
       if (event.type === 'tool_start') {
         console.log(`[Tool called: ${event.toolName}]`);
+      } else if (event.type === 'tool_update') {
+        // Show tool output (stdout/stderr from commands, file contents, etc.)
+        process.stdout.write(event.output);
       } else if (event.type === 'tool_end') {
         console.log(`[Tool completed: ${event.toolName}]`);
+        if (event.output) {
+          console.log('Output:');
+          console.log(event.output.substring(0, 1000));
+          if (event.output.length > 1000) console.log('... (truncated)');
+        }
       } else if (event.type === 'permission_request') {
         console.log(`[Permission request: ${event.tool}]`);
         console.log(`  Description: ${event.description}`);

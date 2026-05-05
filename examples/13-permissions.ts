@@ -15,7 +15,7 @@
  */
 
 import { AutohandSDK } from '../src/index.js';
-import type { SDKEvent } from '../src/types/index.js';
+import type { PermissionMode } from '../src/types/index.js';
 
 /**
  * Main function that demonstrates permission modes
@@ -24,11 +24,10 @@ async function main(): Promise<void> {
   try {
     console.log('=== Permission Modes Demo ===\n');
 
-    // Initialize SDK with different permission modes
-    const permissionModes: Array<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto'> = [
-      'default',
-      'bypassPermissions',
-      'auto',
+    const permissionModes: PermissionMode[] = [
+      'interactive',
+      'restricted',
+      'unrestricted',
     ];
 
     for (const mode of permissionModes) {
@@ -40,6 +39,7 @@ async function main(): Promise<void> {
 
       // Start the CLI subprocess
       await sdk.start();
+      await sdk.setPermissionMode(mode);
       console.log(`✓ SDK started with permission mode: ${mode}`);
 
       // Send a prompt that requires permissions
@@ -49,15 +49,22 @@ async function main(): Promise<void> {
       try {
         let fullResponse = '';
         for await (const event of sdk.streamPrompt({ message: prompt })) {
-          if (event.type === 'permission_request') {
+          if (event.type === 'tool_start') {
+            console.log(`\n[Tool called: ${event.toolName}]`);
+          } else if (event.type === 'tool_end') {
+            console.log(`\n[Tool completed: ${event.toolName}]`);
+            if (event.output) {
+              console.log('  Output:', event.output.substring(0, 500));
+              if (event.output.length > 500) console.log('  ... (truncated)');
+            }
+          } else if (event.type === 'permission_request') {
             console.log(`\n[Permission request: ${event.tool}]`);
             console.log(`  Description: ${event.description}`);
             console.log(`  Request ID: ${event.requestId}`);
 
-            // For demo purposes, auto-approve in non-YOLO modes
-            if (mode !== 'bypassPermissions' && mode !== 'auto') {
+            if (mode === 'interactive') {
               console.log('  Auto-approving for demo...');
-              await sdk.permissionResponse({ requestId: event.requestId, allowed: true });
+              await sdk.allowPermission(event.requestId, 'once');
             }
           } else if (event.type === 'message_update') {
             process.stdout.write(event.delta);

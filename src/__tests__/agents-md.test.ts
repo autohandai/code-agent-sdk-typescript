@@ -4,6 +4,9 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import { mkdir, mkdtemp, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
 
 describe('AGENTS.md Helpers', () => {
@@ -26,18 +29,17 @@ describe('AGENTS.md Helpers', () => {
   });
 
   it('loadAgentsMd loads AGENTS.md content from file path', async () => {
-    // Note: This is a structural test - in reality we'd need to create a temporary file
-    // For now, we verify the function exists and has the correct signature
-    expect(loadAgentsMd).toBeDefined();
-    expect(typeof loadAgentsMd).toBe('function');
+    const dir = await mkdtemp(join(tmpdir(), 'autohand-agents-md-'));
+    const filePath = join(dir, 'AGENTS.md');
+    await writeFile(filePath, '# Test Agents\n\nUse strict TypeScript.\n', 'utf-8');
+
+    await expect(loadAgentsMd(filePath)).resolves.toBe('# Test Agents\n\nUse strict TypeScript.\n');
   });
 
   it('loadAgentsMd handles missing file gracefully', async () => {
-    // Verify the function exists and has the correct signature
-    expect(loadAgentsMd).toBeDefined();
-    expect(typeof loadAgentsMd).toBe('function');
-    
-    // Note: Full integration test would require creating a temporary directory
-    // This verifies the method signature and error handling behavior
+    const dir = await mkdtemp(join(tmpdir(), 'autohand-agents-md-'));
+    await mkdir(join(dir, 'nested'));
+
+    await expect(loadAgentsMd(join(dir, 'missing.md'))).rejects.toThrow('AGENTS.md not found');
   });
 });

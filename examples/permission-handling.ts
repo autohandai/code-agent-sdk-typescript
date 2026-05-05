@@ -20,11 +20,8 @@ async function main() {
         console.log(`[Permission Request] ${event.description}`);
         console.log(`Tool: ${event.tool}`);
 
-        // Auto-allow all permissions for this example
-        await sdk.permissionResponse({
-          requestId: event.requestId,
-          allowed: true,
-        });
+        // Auto-allow for this example. Production hosts should route this to a UI.
+        await sdk.allowPermission(event.requestId, 'once');
       } else if (event.type === 'message_update') {
         process.stdout.write(event.delta);
       } else if (event.type === 'agent_end') {

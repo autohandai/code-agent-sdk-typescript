@@ -44,8 +44,16 @@ function handleEvent(event: SDKEvent): void {
     case 'tool_start':
       console.log(`\n[Tool called: ${event.toolName}]`);
       break;
+    case 'tool_update':
+      // Stream tool output (command stdout/stderr, file contents, etc.)
+      process.stdout.write(event.output);
+      break;
     case 'tool_end':
       console.log(`\n[Tool completed: ${event.toolName}]`);
+      if (event.output) {
+        console.log('  Output:', event.output.substring(0, 500));
+        if (event.output.length > 500) console.log('  ... (truncated)');
+      }
       break;
     case 'permission_request':
       console.log(`\n[Permission request: ${event.tool}]`);

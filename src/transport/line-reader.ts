@@ -92,7 +92,11 @@ export class LineReader {
    */
   private deliverLine(line: string): void {
     if (this.resolvers.length > 0) {
-      const resolver = this.resolvers.shift()!;
+      const resolver = this.resolvers.shift();
+      if (resolver === undefined) {
+        this.lineQueue.push(line);
+        return;
+      }
       resolver(line);
     } else {
       this.lineQueue.push(line);
@@ -110,7 +114,11 @@ export class LineReader {
    */
   async readLine(): Promise<string> {
     if (this.lineQueue.length > 0) {
-      return this.lineQueue.shift()!;
+      const line = this.lineQueue.shift();
+      if (line === undefined) {
+        throw new Error('Line queue unexpectedly empty');
+      }
+      return line;
     }
 
     if (this.closed) {

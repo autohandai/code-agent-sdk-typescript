@@ -23,10 +23,13 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { promises as fs } from 'fs';
-import type { ProviderName } from '../types/index.js';
+import type { ProviderName, AutohandEnvVars } from '../types/index.js';
 import { LineReader } from './line-reader.js';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
+
+const currentDirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Configuration options for the Transport layer
@@ -108,18 +111,12 @@ export interface TransportOptions {
   // Skills options
   /** Specific skills to load (by name) */
   skills?: string[];
+  /** SKILL.md files to copy before loading skills by name */
+  skillFiles?: string[];
   /** Skill sources to search */
   skillSources?: string[];
   /** Whether to install missing skills from community */
   installMissingSkills?: boolean;
-
-  // Permissions options
-  /** Permission mode */
-  permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto';
-  /** Permission allow list */
-  permissionAllowList?: string[];
-  /** Permission deny list */
-  permissionDenyList?: string[];
 
   // Provider-specific options
   /** Provider name (optional, auto-detected from model ID) */
@@ -130,6 +127,16 @@ export interface TransportOptions {
   baseUrl?: string;
   /** Port for local provider */
   port?: number;
+
+  // Environment variables
+  /** AUTOHAND_ prefixed environment variables forwarded to the CLI subprocess */
+  envVars?: AutohandEnvVars;
+
+  // Hooks options
+  /** Enable hooks globally */
+  hooksEnabled?: boolean;
+  /** Hook definitions to register */
+  hooksDefinitions?: import('../types/index.js').HookDefinition[];
 }
 
 export class Transport {
@@ -139,7 +146,6 @@ export class Transport {
   private notificationCallbacks = new Map<string, (params: unknown) => void>();
   private requestIdCounter = 0;
   private debug: boolean;
-  private messageBuffer: string = '';
 
   /**
    * Create a new Transport instance
@@ -162,22 +168,27 @@ export class Transport {
     const cliPath = this.options.cliPath ?? await this.detectCLIBinary();
     const cwd = this.options.cwd ?? process.cwd();
 
+    // Copy skill files before starting CLI
+    if (this.options.skillFiles !== undefined) {
+      await this.copySkillFiles(cwd);
+    }
+
     this.log(`Starting CLI: ${cliPath}`);
     this.log(`Working directory: ${cwd}`);
 
     // Build CLI arguments
     const args = ['--mode', 'rpc'];
 
-    if (this.options.unrestricted) {
+    if (this.options.unrestricted === true) {
       args.push('--unrestricted');
     }
-    if (this.options.autoMode) {
+    if (this.options.autoMode === true) {
       args.push('--auto-mode');
     }
-    if (this.options.autoSkill) {
+    if (this.options.autoSkill === true) {
       args.push('--auto-skill');
     }
-    if (this.options.autoCommit) {
+    if (this.options.autoCommit === true) {
       args.push('-c');
     }
     if (this.options.contextCompact === false) {
@@ -185,22 +196,22 @@ export class Transport {
     } else if (this.options.contextCompact === true) {
       args.push('--context-compact');
     }
-    if (this.options.persistSession) {
+    if (this.options.persistSession === true) {
       args.push('--persist-session');
     }
-    if (this.options.sessionId) {
+    if (this.options.sessionId !== undefined) {
       args.push('--session-id', this.options.sessionId);
     }
-    if (this.options.resume) {
+    if (this.options.resume === true) {
       args.push('--resume');
     }
-    if (this.options.continue) {
+    if (this.options.continue === true) {
       args.push('--continue');
     }
-    if (this.options.sessionPath) {
+    if (this.options.sessionPath !== undefined) {
       args.push('--session-path', this.options.sessionPath);
     }
-    if (this.options.autoSaveInterval) {
+    if (this.options.autoSaveInterval !== undefined) {
       args.push('--auto-save-interval', String(this.options.autoSaveInterval));
     }
     if (this.options.agentsMdEnable === false) {
@@ -208,83 +219,87 @@ export class Transport {
     } else if (this.options.agentsMdEnable === true) {
       args.push('--agents-md');
     }
-    if (this.options.agentsMdCreate) {
+    if (this.options.agentsMdCreate === true) {
       args.push('--agents-md-create');
     }
-    if (this.options.agentsMdPath) {
+    if (this.options.agentsMdPath !== undefined) {
       args.push('--agents-md-path', this.options.agentsMdPath);
     }
-    if (this.options.agentsMdAutoUpdate) {
+    if (this.options.agentsMdAutoUpdate === true) {
       args.push('--agents-md-auto-update');
     }
-    if (this.options.maxTokens) {
+    if (this.options.maxTokens !== undefined) {
       args.push('--max-tokens', String(this.options.maxTokens));
     }
-    if (this.options.compressionThreshold) {
+    if (this.options.compressionThreshold !== undefined) {
       args.push('--compression-threshold', String(this.options.compressionThreshold));
     }
-    if (this.options.summarizationThreshold) {
+    if (this.options.summarizationThreshold !== undefined) {
       args.push('--summarization-threshold', String(this.options.summarizationThreshold));
     }
-    if (this.options.skills && this.options.skills.length > 0) {
+    if (this.options.skills !== undefined && this.options.skills.length > 0) {
       args.push('--skills', this.options.skills.join(','));
     }
-    if (this.options.skillSources && this.options.skillSources.length > 0) {
+    if (this.options.skillSources !== undefined && this.options.skillSources.length > 0) {
       args.push('--skill-sources', this.options.skillSources.join(','));
     }
-    if (this.options.installMissingSkills) {
+    if (this.options.installMissingSkills === true) {
       args.push('--install-missing-skills');
     }
-    if (this.options.permissionMode) {
-      args.push('--permission-mode', this.options.permissionMode);
-    }
-    if (this.options.permissionAllowList && this.options.permissionAllowList.length > 0) {
-      args.push('--permission-allow-list', this.options.permissionAllowList.join(','));
-    }
-    if (this.options.permissionDenyList && this.options.permissionDenyList.length > 0) {
-      args.push('--permission-deny-list', this.options.permissionDenyList.join(','));
-    }
-    if (this.options.maxIterations) {
+    if (this.options.maxIterations !== undefined) {
       args.push('--max-iterations', String(this.options.maxIterations));
     }
-    if (this.options.maxRuntime) {
+    if (this.options.maxRuntime !== undefined) {
       args.push('--max-runtime', String(this.options.maxRuntime));
     }
-    if (this.options.maxCost) {
+    if (this.options.maxCost !== undefined) {
       args.push('--max-cost', String(this.options.maxCost));
     }
-    if (this.options.sysPrompt) {
+    if (this.options.sysPrompt !== undefined) {
       args.push('--sys-prompt', this.options.sysPrompt);
     }
-    if (this.options.appendSysPrompt) {
+    if (this.options.appendSysPrompt !== undefined) {
       args.push('--append-sys-prompt', this.options.appendSysPrompt);
     }
-    if (this.options.model) {
+    if (this.options.model !== undefined) {
       args.push('--model', this.options.model);
     }
-    if (this.options.temperature) {
+    if (this.options.temperature !== undefined) {
       args.push('--temperature', String(this.options.temperature));
     }
-    if (this.options.yolo) {
+    if (this.options.yolo !== undefined) {
       args.push('--yolo', this.options.yolo);
     }
-    if (this.options.yoloTimeout) {
+    if (this.options.yoloTimeout !== undefined) {
       args.push('--yolo-timeout', String(this.options.yoloTimeout));
     }
-    if (this.options.addDir && this.options.addDir.length > 0) {
+    if (this.options.addDir !== undefined && this.options.addDir.length > 0) {
       this.options.addDir.forEach((dir) => {
         args.push('--add-dir', dir);
       });
     }
-    if (this.options.extraArgs) {
+    if (this.options.extraArgs !== undefined) {
       args.push(...this.options.extraArgs);
     }
 
     this.log(`CLI args: ${args.join(' ')}`);
 
+    // Build environment variables to forward to CLI subprocess
+    const env: Record<string, string> = { ...process.env } as Record<string, string>;
+    // Enable tool output streaming for SDK events
+    env.AUTOHAND_STREAM_TOOL_OUTPUT = '1';
+    if (this.options.envVars) {
+      for (const [key, value] of Object.entries(this.options.envVars)) {
+        if (value !== undefined) {
+          env[key] = value;
+        }
+      }
+    }
+
     this.process = spawn(cliPath, args, {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env,
     });
 
     this.process.on('error', (error) => {
@@ -297,16 +312,16 @@ export class Transport {
     });
 
     // Setup line reader for stdout
-    this.lineReader = new LineReader(this.process.stdout!);
-    this.lineReader.readLine().then(() => {
-      this.startReadingResponses();
-    });
+    const stdout = this.process.stdout;
+    if (stdout === null) {
+      throw new Error('Process stdout not available');
+    }
+    this.lineReader = new LineReader(stdout);
+    void this.startReadingResponses();
 
-    // Log stderr and parse events from debug logs
+    // Keep stderr out of the JSON-RPC stdout channel.
     this.process.stderr?.on('data', (data: Buffer) => {
-      const output = data.toString();
-      this.log(`STDERR: ${output}`);
-      this.parseStderrEvents(output);
+      this.log(`STDERR: ${data.toString()}`);
     });
 
     // Wait for process to be ready
@@ -319,13 +334,14 @@ export class Transport {
    * Gracefully terminates the CLI process using SIGTERM and waits for exit.
    */
   async stop(): Promise<void> {
-    if (this.process) {
+    if (this.process !== null) {
+      const process = this.process;
       this.log('Stopping CLI process');
-      this.process.kill('SIGTERM');
+      process.kill('SIGTERM');
       
       // Wait for process to exit
       await new Promise((resolve) => {
-        this.process!.once('exit', resolve);
+        process.once('exit', resolve);
       });
 
       this.process = null;
@@ -382,7 +398,7 @@ export class Transport {
     if (this.process.stdin) {
       this.process.stdin.write(JSON.stringify(request) + '\n');
     } else {
-      reject(new Error('Process stdin not available'));
+      throw new Error('Process stdin not available');
     }
 
     return responsePromise;
@@ -507,7 +523,7 @@ export class Transport {
     }
 
     // Try to find binary in package
-    const packagePath = path.join(__dirname, '../../cli', binaryName);
+    const packagePath = path.join(currentDirname, '../../cli', binaryName);
     
     // Try to find binary in system PATH
     const systemPath = binaryName;
@@ -535,63 +551,60 @@ export class Transport {
   }
 
   /**
-   * Parse events from stderr debug logs
-   * 
-   * Temporary workaround to extract event information from CLI debug logs.
-   * This parses [RPC DEBUG] prefixed lines to reconstruct message content
-   * and turn lifecycle events.
-   * 
-   * @param output - Stderr output to parse
-   * @private
-   */
-  private parseStderrEvents(output: string): void {
-    const lines = output.split('\n');
-    for (const line of lines) {
-      // Parse message content start
-      const messageContentMatch = line.match(/\[RPC DEBUG\] Emitting message content: (.+)/);
-      if (messageContentMatch?.[1]) {
-        this.messageBuffer = messageContentMatch[1];
-        continue;
-      }
-
-      // Accumulate additional message content lines (lines that don't start with [RPC DEBUG])
-      if (this.messageBuffer && !line.startsWith('[RPC DEBUG]') && line.trim()) {
-        this.messageBuffer += '\n' + line;
-        continue;
-      }
-
-      // Parse Emitting MESSAGE_END - emit the accumulated message
-      const messageEndMatch = line.match(/\[RPC DEBUG\] Emitting MESSAGE_END, messageId=(\w+)/);
-      if (messageEndMatch) {
-        const messageCallback = this.notificationCallbacks.get('message');
-        if (messageCallback && this.messageBuffer) {
-          messageCallback(this.messageBuffer);
-        }
-        const endCallback = this.notificationCallbacks.get('message_end');
-        if (endCallback) {
-          endCallback({ messageId: messageEndMatch[1], content: this.messageBuffer || '', timestamp: new Date().toISOString() });
-        }
-        this.messageBuffer = '';
-        continue;
-      }
-
-      // Parse Emitting TURN_END
-      const turnEndMatch = line.match(/\[RPC DEBUG\] Emitting TURN_END, turnId=(\w+)/);
-      if (turnEndMatch) {
-        const callback = this.notificationCallbacks.get('turn_end');
-        if (callback) {
-          callback({ turnId: turnEndMatch[1], timestamp: new Date().toISOString() });
-        }
-      }
-    }
-  }
-
-  /**
    * Check if the process is running
    * 
    * @returns true if the process exists and has not been killed
    */
   isRunning(): boolean {
     return this.process !== null && !this.process.killed;
+  }
+
+  /**
+   * Copy skill files to the appropriate directories
+   * 
+   * Detects file paths in skills array and copies them to ~/.autohand/skills/
+   * before starting the CLI. This enables using custom skill files via SDK config.
+   * 
+   * @param cwd - Working directory for resolving relative paths
+   * @private
+   */
+  private async copySkillFiles(cwd: string): Promise<void> {
+    const homeDir = os.homedir();
+    const autohandSkillsDir = path.join(homeDir, '.autohand', 'skills');
+
+    for (const skill of this.options.skillFiles ?? []) {
+      // Resolve the source path
+      const srcPath = path.resolve(cwd, skill);
+
+      try {
+        // Check if file exists
+        await fs.access(srcPath);
+
+        // Determine skill name from directory structure
+        // e.g., "./skills/my-skill/SKILL.md" -> "my-skill"
+        const parts = skill.split(/[\\/]/).filter(p => p && p !== '.' && p !== '..');
+        let skillName = parts[parts.length - 1];
+        if (skillName === 'SKILL.md' && parts.length > 1) {
+          skillName = parts[parts.length - 2];
+        }
+        skillName = skillName?.replace(/\.md$/i, '') ?? 'custom-skill';
+
+        // Copy to user skills directory
+        const destDir = path.join(autohandSkillsDir, skillName);
+        const destPath = path.join(destDir, 'SKILL.md');
+
+        // Create directory if it doesn't exist
+        await fs.mkdir(destDir, { recursive: true });
+
+        // Copy the file
+        const content = await fs.readFile(srcPath, 'utf-8');
+        await fs.writeFile(destPath, content);
+
+        this.log(`Copied skill file: ${srcPath} -> ${destPath}`);
+      } catch (error) {
+        this.log(`Failed to copy skill file ${skill}: ${error}`);
+        // Don't throw - let CLI handle missing skills
+      }
+    }
   }
 }
