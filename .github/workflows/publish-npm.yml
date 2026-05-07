@@ -1,13 +1,29 @@
-name: Publish npm package
+name: Package CI and npm release
 
 on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
   release:
     types:
       - published
   workflow_dispatch:
     inputs:
+      mode:
+        description: Workflow mode to run
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - test
+          - canary
+          - release
       dist_tag:
-        description: npm distribution tag to publish
+        description: npm distribution tag for manual release mode
         required: true
         default: latest
         type: choice
@@ -19,19 +35,16 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref }}
+  group: npm-package-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.mode || 'auto' }}
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Validate and publish to npm
+  validate:
+    name: Validate package
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +75,201 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build package
+        run: bun run build
+
+      - name: Preview package contents
+        run: npm pack --dry-run
+
+      - name: Verify package size budget
+        run: |
+          package_size="$(
+            npm pack --dry-run --json \
+              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
+          )"
+          max_package_size=$((250 * 1024 * 1024))
+
+          if [ "$package_size" -gt "$max_package_size" ]; then
+            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
+            exit 1
+          fi
+
+  test:
+    name: Test package
+    needs:
+      - validate
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'test' || inputs.mode == 'canary' || inputs.mode == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: true
+
+      - name: Restore Git LFS assets
+        run: |
+          git lfs pull
+          git lfs checkout
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: bun run test
+
+      - name: Validate examples
+        run: bun run test:examples
+
+      - name: Compile examples
+        run: bun run build:examples
+
+  publish_canary:
+    name: Publish npm canary
+    needs:
+      - validate
+      - test
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'canary'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: true
+
+      - name: Restore Git LFS assets
+        run: |
+          git lfs pull
+          git lfs checkout
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate npm token
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before publishing."
+            exit 1
+          fi
+
+          npm whoami
+
+      - name: Create canary version
+        run: |
+          base_version="$(node -p "require('./package.json').version.split('-')[0]")"
+          short_sha="$(printf '%.7s' "$GITHUB_SHA")"
+          canary_version="${base_version}-canary.${GITHUB_RUN_NUMBER}.sha${short_sha}"
+
+          npm version "$canary_version" --no-git-tag-version --allow-same-version
+          echo "CANARY_VERSION=$canary_version" >> "$GITHUB_ENV"
+
+      - name: Verify canary version is unpublished
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+
+          if npm view "$package_name@$CANARY_VERSION" version >/dev/null 2>&1; then
+            echo "::error::$package_name@$CANARY_VERSION is already published on npm."
+            exit 1
+          fi
+
+      - name: Validate package
+        run: bun run prepublishOnly
+
+      - name: Preview package contents
+        run: npm pack --dry-run
+
+      - name: Verify package size budget
+        run: |
+          package_size="$(
+            npm pack --dry-run --json \
+              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
+          )"
+          max_package_size=$((250 * 1024 * 1024))
+
+          if [ "$package_size" -gt "$max_package_size" ]; then
+            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
+            exit 1
+          fi
+
+      - name: Publish canary package
+        run: npm publish --access public --provenance --tag canary
+
+  publish_release:
+    name: Publish npm release
+    needs:
+      - validate
+      - test
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'release')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: true
+
+      - name: Restore Git LFS assets
+        run: |
+          git lfs pull
+          git lfs checkout
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -140,5 +348,5 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Publish package
+      - name: Publish release package
         run: npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
