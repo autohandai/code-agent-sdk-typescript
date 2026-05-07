@@ -39,8 +39,8 @@
     "lint": "eslint src --ext .ts",
     "test": "bun test src/__tests__",
     "test:examples": "bun run examples/test-examples.ts",
-    "build:example:structured-json": "bun build examples/25-structured-json.ts --outdir /private/tmp/autohand-sdk-example-25-check --target=node",
-    "build:examples": "bun build examples/*.ts --outdir /private/tmp/autohand-sdk-all-example-check --target=node",
+    "build:example:structured-json": "node scripts/build-examples.mjs examples/25-structured-json.ts",
+    "build:examples": "node scripts/build-examples.mjs",
     "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run lint"
   },
   "keywords": [
