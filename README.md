@@ -1,6 +1,6 @@
-# @autohand/agent-sdk
+# Code Agent SDK for TypeScript
 
-Autohand Agent SDK - CLI wrapper implementation for TypeScript.
+Autohand Code Agent SDK - CLI wrapper implementation for TypeScript.
 
 ## Overview
 
@@ -17,6 +17,14 @@ The SDK:
 - Communicates via JSON-RPC 2.0 over stdin/stdout
 - Provides an idiomatic TypeScript API
 - Supports streaming events
+
+## Other SDKs
+
+Use the same CLI-backed SDK model from another language:
+
+- [TypeScript](https://github.com/autohandai/code-agent-sdk-typescript) - this package, with `Agent`, `Run`, streaming, and JSON helpers.
+- [Go](https://github.com/autohandai/code-agent-sdk-go) - idiomatic Go package with `context.Context`, typed events, and channel-based streaming.
+- [Python](https://github.com/autohandai/code-agent-sdk-python) - async Python package with `async for` event streams and typed Pydantic models.
 
 ## Installation
 
@@ -438,4 +446,4 @@ Apache License 2.0
 
 - [CLI Repository](https://github.com/autohandai/cli)
 - [Documentation](https://autohand.ai/sdk/)
-- [Issues](https://github.com/autohandai/agent-sdk-typescript/issues)
+- [Issues](https://github.com/autohandai/code-agent-sdk-typescript/issues)

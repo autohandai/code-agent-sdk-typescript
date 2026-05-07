@@ -2,14 +2,14 @@
   "name": "@autohand/agent-sdk",
   "version": "1.0.0",
   "license": "Apache-2.0",
-  "description": "Autohand Agent SDK - CLI wrapper implementation",
+  "description": "Autohand Code Agent SDK - CLI wrapper implementation",
   "repository": {
     "type": "git",
-    "url": "https://github.com/autohandai/agent-sdk-typescript"
+    "url": "https://github.com/autohandai/code-agent-sdk-typescript"
   },
   "homepage": "https://autohand.ai/sdk/",
   "bugs": {
-    "url": "https://github.com/autohandai/agent-sdk-typescript/issues"
+    "url": "https://github.com/autohandai/code-agent-sdk-typescript/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -38,6 +38,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "bun test src/__tests__",
+    "test:examples": "bun run examples/test-examples.ts",
+    "build:example:structured-json": "bun build examples/25-structured-json.ts --outdir /private/tmp/autohand-sdk-example-25-check --target=node",
+    "build:examples": "bun build examples/*.ts --outdir /private/tmp/autohand-sdk-all-example-check --target=node",
     "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run lint"
   },
   "keywords": [

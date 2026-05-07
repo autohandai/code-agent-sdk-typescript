@@ -27,6 +27,8 @@ for (const file of exampleFiles) {
 
     const usesSDK = content.includes('new AutohandSDK') || content.includes('import { AutohandSDK }');
     const usesAgent = content.includes('Agent.create') || content.includes('import { Agent }');
+    const startsSdk = /await\s+\w+\.start\(/.test(content);
+    const stopsSdk = /await\s+\w+\.(?:stop|close)\(/.test(content);
 
     // Validate structure without requiring every example to use the same API layer.
     const checks = {
@@ -34,10 +36,10 @@ for (const file of exampleFiles) {
       hasMain: content.includes('async function main'),
       hasLifecycleStart: usesAgent
         ? content.includes('Agent.create')
-        : content.includes('await sdk.start'),
+        : startsSdk,
       hasLifecycleStop: usesAgent
         ? content.includes('await agent.close')
-        : content.includes('await sdk.stop') || content.includes('await sdk.close'),
+        : stopsSdk,
       hasSupportedApi: usesSDK || usesAgent,
       hasErrorHandling: content.includes('try {') && content.includes('catch'),
     };
