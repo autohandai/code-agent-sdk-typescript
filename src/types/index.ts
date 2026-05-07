@@ -766,7 +766,6 @@ export async function loadConfigFrom(configPath: string): Promise<SDKConfig> {
         break;
       case 'toml':
         try {
-          // @ts-expect-error - toml package is optional
           const toml = await import('toml');
           config = toml.parse(content) as SDKConfig;
         } catch (e) {

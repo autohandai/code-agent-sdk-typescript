@@ -53,12 +53,15 @@
   "engines": {
     "node": ">=18.17.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "toml": "^4.1.1",
+    "yaml": "^2.8.4"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "eslint": "^8.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0"
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
   }
 }

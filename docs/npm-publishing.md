@@ -20,7 +20,7 @@ Secret name:
 
 The `Package CI and npm release` workflow supports four manual modes:
 
-- `validate`: typechecks, lints, builds, verifies Git LFS CLI assets, previews the npm package, and checks the package size budget.
+- `validate`: audits production dependencies, typechecks, lints, builds, verifies Git LFS CLI assets, previews the npm package, and checks the package size budget.
 - `test`: runs everything in `validate`, then runs unit tests, example validation, and example compilation.
 - `canary`: runs `validate` and `test`, creates a temporary `X.Y.Z-canary.RUN.shaSHA` package version, and publishes it under the `canary` dist-tag.
 - `release`: runs `validate` and `test`, verifies the package version is unpublished, and publishes the current package version to npm.
