@@ -1,0 +1,144 @@
+name: Publish npm package
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: npm distribution tag to publish
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+          - alpha
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Validate and publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: true
+
+      - name: Restore Git LFS assets
+        run: |
+          git lfs pull
+          git lfs checkout
+
+      - name: Verify bundled CLI assets
+        run: |
+          if [ ! -d cli ] || [ -z "$(find cli -maxdepth 1 -type f -print -quit)" ]; then
+            echo "::error::No bundled CLI assets were found in ./cli."
+            exit 1
+          fi
+
+          for file in cli/*; do
+            if [ ! -s "$file" ]; then
+              echo "::error::$file is empty."
+              exit 1
+            fi
+
+            if grep -a -q "git-lfs.github.com/spec/v1" "$file"; then
+              echo "::error::$file is still a Git LFS pointer. The real CLI binary was not restored."
+              exit 1
+            fi
+          done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate npm token
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before publishing."
+            exit 1
+          fi
+
+          npm whoami
+
+      - name: Verify release tag matches package version
+        if: github.event_name == 'release'
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          release_tag="${{ github.event.release.tag_name }}"
+
+          if [ "$release_tag" != "v$package_version" ] && [ "$release_tag" != "$package_version" ]; then
+            echo "::error::Release tag '$release_tag' must match package version '$package_version' or 'v$package_version'."
+            exit 1
+          fi
+
+      - name: Verify package version is unpublished
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+
+          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+            echo "::error::$package_name@$package_version is already published on npm."
+            exit 1
+          fi
+
+      - name: Validate package
+        run: bun run prepublishOnly
+
+      - name: Preview package contents
+        run: npm pack --dry-run
+
+      - name: Verify package size budget
+        run: |
+          package_size="$(
+            npm pack --dry-run --json \
+              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
+          )"
+          max_package_size=$((250 * 1024 * 1024))
+
+          if [ "$package_size" -gt "$max_package_size" ]; then
+            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
+            exit 1
+          fi
+
+      - name: Resolve npm dist-tag
+        id: dist-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.dist_tag }}"
+          elif [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            tag="next"
+          else
+            tag="latest"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package
+        run: npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
