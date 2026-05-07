@@ -7,7 +7,7 @@
  * 
  * @example
  * ```typescript
- * import { AutohandSDK } from '@autohand/agent-sdk';
+ * import { AutohandSDK } from '@autohandai/agent-sdk';
  * 
  * const sdk = new AutohandSDK({
  *   cwd: '/path/to/project',

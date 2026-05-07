@@ -26,7 +26,7 @@ console.log(result);
 New:
 
 ```typescript
-import { AutohandSDK } from '@autohand/agent-sdk';
+import { AutohandSDK } from '@autohandai/agent-sdk';
 
 const sdk = new AutohandSDK({ cwd: '.' });
 await sdk.start();
@@ -46,7 +46,7 @@ console.log(text);
 Or use the high-level `Agent` class:
 
 ```typescript
-import { Agent } from '@autohand/agent-sdk';
+import { Agent } from '@autohandai/agent-sdk';
 
 const agent = await Agent.create({ cwd: '.' });
 const result = await agent.run('Summarize the API');
@@ -147,7 +147,7 @@ await sdk.streamPrompt({ message: 'What language do I prefer? Check memory.' });
 
 ```bash
 npm uninstall @autohandai/agent-sdk-typescript
-npm install @autohand/agent-sdk
+npm install @autohandai/agent-sdk
 ```
 
 ## When to Stay on the Library SDK

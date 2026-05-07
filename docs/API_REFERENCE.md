@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API reference for @autohand/agent-sdk TypeScript SDK.
+Complete API reference for @autohandai/agent-sdk TypeScript SDK.
 
 ## Table of Contents
 

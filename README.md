@@ -31,7 +31,7 @@ Use the same CLI-backed SDK model from another language:
 ## Installation
 
 ```bash
-npm install @autohand/agent-sdk
+npm install @autohandai/agent-sdk
 ```
 
 ## Quick Start
@@ -42,7 +42,7 @@ Use `Agent` for application code. It gives you an explicit run lifecycle while
 keeping CLI subprocess and JSON-RPC details out of your app.
 
 ```typescript
-import { Agent } from '@autohand/agent-sdk';
+import { Agent } from '@autohandai/agent-sdk';
 
 const agent = await Agent.create({
   cwd: '.', // Optional: defaults to process.cwd()
@@ -91,7 +91,7 @@ const risk = await agent.runJson<ReleaseRisk>('Assess publish readiness', {
 ### Low-Level API
 
 ```typescript
-import { AutohandSDK } from '@autohand/agent-sdk';
+import { AutohandSDK } from '@autohandai/agent-sdk';
 
 const sdk = new AutohandSDK({
   cwd: '.', // Optional: defaults to process.cwd()

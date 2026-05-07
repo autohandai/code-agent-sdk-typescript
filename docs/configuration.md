@@ -5,7 +5,7 @@ The SDK accepts a single `SDKConfig` object. Every field is optional.
 ## Basic Options
 
 ```typescript
-import { AutohandSDK } from '@autohand/agent-sdk';
+import { AutohandSDK } from '@autohandai/agent-sdk';
 
 const sdk = new AutohandSDK({
   cwd: '.',                    // Working directory. Defaults to process.cwd().
@@ -51,7 +51,7 @@ The SDK auto-detects the provider from the model string when possible. Pass `pro
 ## Loading Config from File
 
 ```typescript
-import { loadConfigFrom, loadWorkspaceConfig } from '@autohand/agent-sdk';
+import { loadConfigFrom, loadWorkspaceConfig } from '@autohandai/agent-sdk';
 
 // JSON, TOML, or YAML
 const config = await loadConfigFrom('~/.autohand/config.yaml');

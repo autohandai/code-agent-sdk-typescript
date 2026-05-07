@@ -24,13 +24,13 @@ Example `~/.autohand/config.json`:
 ## Installation
 
 ```bash
-npm install @autohand/agent-sdk
+npm install @autohandai/agent-sdk
 ```
 
 If you use Bun:
 
 ```bash
-bun add @autohand/agent-sdk
+bun add @autohandai/agent-sdk
 ```
 
 ## Your First Prompt
@@ -38,7 +38,7 @@ bun add @autohand/agent-sdk
 Create a file named `first-prompt.ts`:
 
 ```typescript
-import { AutohandSDK } from '@autohand/agent-sdk';
+import { AutohandSDK } from '@autohandai/agent-sdk';
 
 async function main() {
   const sdk = new AutohandSDK({
@@ -73,7 +73,7 @@ The SDK will auto-detect the correct CLI binary for your platform, spawn it, sen
 `prompt()` is fire-and-forget. Most applications want to see what the agent is doing in real time. Use `streamPrompt()` instead:
 
 ```typescript
-import { AutohandSDK } from '@autohand/agent-sdk';
+import { AutohandSDK } from '@autohandai/agent-sdk';
 
 async function main() {
   const sdk = new AutohandSDK({ cwd: '.' });
@@ -125,7 +125,7 @@ For unattended scripts you can disable interactive permission checks with `permi
 If you do not want to manage the subprocess lifecycle manually, use the `Agent` class:
 
 ```typescript
-import { Agent } from '@autohand/agent-sdk';
+import { Agent } from '@autohandai/agent-sdk';
 
 const agent = await Agent.create({
   cwd: '.',
