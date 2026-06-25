@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: true
@@ -80,7 +80,7 @@ jobs:
           done
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -121,6 +121,24 @@ jobs:
             exit 1
           fi
 
+      - name: Build dependency update package
+        if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+        run: |
+          package_file="$(
+            npm pack --json \
+              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].filename));"
+          )"
+
+          echo "PACKAGE_FILE=$package_file" >> "$GITHUB_ENV"
+
+      - name: Upload dependency update package
+        if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-update-package-${{ github.run_id }}
+          path: "*.tgz"
+          retention-days: 7
+
   test:
     name: Test package
     needs:
@@ -130,7 +148,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: true
@@ -141,7 +159,7 @@ jobs:
           git lfs checkout
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -178,7 +196,7 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: true
@@ -189,7 +207,7 @@ jobs:
           git lfs checkout
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
@@ -267,7 +285,7 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: true
@@ -278,7 +296,7 @@ jobs:
           git lfs checkout
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
@@ -341,6 +359,25 @@ jobs:
             exit 1
           fi
 
+      - name: Build release package artifact
+        run: |
+          package_file="$(
+            npm pack --json \
+              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].filename));"
+          )"
+
+          shasum -a 256 "$package_file" > "$package_file.sha256"
+          echo "PACKAGE_FILE=$package_file" >> "$GITHUB_ENV"
+
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-release-package-${{ github.run_id }}
+          path: |
+            *.tgz
+            *.tgz.sha256
+          retention-days: 30
+
       - name: Resolve npm dist-tag
         id: dist-tag
         run: |
@@ -355,4 +392,4 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Publish release package
-        run: npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
+        run: npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"

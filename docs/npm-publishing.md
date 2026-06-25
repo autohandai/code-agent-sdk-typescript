@@ -27,6 +27,8 @@ The `Package CI and npm release` workflow supports four manual modes:
 
 Pull requests and pushes to `main` automatically run validation and tests without requiring `NPM_TOKEN`.
 
+Dependabot is configured for npm dependencies and GitHub Actions. Its pull requests run the same validation and test gates, and dependency-update PRs also build and upload a short-lived npm package artifact so the updated dependency set is inspectable before merge. Release runs build the packed npm tarball, upload it with a SHA-256 checksum, and publish that exact artifact to npm.
+
 ## Release Flow
 
 1. Update `package.json` and `package-lock.json` to the new version.
