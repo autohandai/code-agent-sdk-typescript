@@ -7,7 +7,7 @@
  *
  * Prerequisites:
  * - Autohand CLI must be installed and available in PATH
- * - CLI must be authenticated (run `autohand login` first)
+ * - AUTOHAND_AI_API_KEY must be set for Autohand AI SDK Cloud usage
  * - Optional: Create a custom skill file at ./skills/my-custom/SKILL.md
  *
  * Usage:
@@ -41,7 +41,9 @@ async function main(): Promise<void> {
     // Initialize SDK with direct skill configuration
     const sdk = new AutohandSDK({
       cwd: process.cwd(),
-      model: 'fantail2',
+      provider: 'autohandai',
+      model: 'fantail',
+      apiKey: process.env.AUTOHAND_AI_API_KEY,
       cliPath: '/Users/igorcosta/Documents/autohand/cli-3/autohand',
       skills, // SDK auto-detects file paths and copies them to ~/.autohand/skills/
     });

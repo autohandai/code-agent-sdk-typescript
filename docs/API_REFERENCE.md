@@ -1522,7 +1522,7 @@ type PermissionDecisionScope = 'once' | 'session' | 'project' | 'user';
 Available providers in CLI-3.
 
 ```typescript
-type ProviderName = 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
+type ProviderName = 'autohandai' | 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
 ```
 
 ---
@@ -1583,6 +1583,9 @@ interface AutohandEnvVars {
   AUTOHAND_HOME?: string;
   AUTOHAND_API_URL?: string;
   AUTOHAND_CONFIG?: string;
+  AUTOHAND_AI_API_KEY?: string;
+  AUTOHAND_AI_BASE_URL?: string;
+  AUTOHAND_AI_PLAN?: string;
   AUTOHAND_DEBUG?: string;
   AUTOHAND_CLIENT_NAME?: string;
   AUTOHAND_CLIENT_VERSION?: string;

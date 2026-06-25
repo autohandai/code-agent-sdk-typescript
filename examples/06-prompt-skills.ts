@@ -7,7 +7,7 @@
  *
  * Prerequisites:
  * - Autohand CLI must be installed and available in PATH
- * - CLI must be authenticated (run `autohand login` first)
+ * - AUTOHAND_AI_API_KEY must be set for Autohand AI SDK Cloud usage
  *
  * Usage:
  *   bun run examples/06-prompt-skills.ts
@@ -26,7 +26,9 @@ async function main(): Promise<void> {
     // Initialize SDK with skills that can be referenced in prompts
     const sdk = new AutohandSDK({
       cwd: process.cwd(),
-      model: 'fantail2',
+      provider: 'autohandai',
+      model: 'fantail',
+      apiKey: process.env.AUTOHAND_AI_API_KEY,
       cliPath: '/Users/igorcosta/Documents/autohand/cli-3/autohand',
       // These skills are available for the agent to use via "/skill <name>"
       skills: ['typescript', 'testing', 'react', 'nodejs'],

@@ -125,6 +125,8 @@ export interface TransportOptions {
   apiKey?: string;
   /** Base URL for the provider API */
   baseUrl?: string;
+  /** Autohand AI plan style */
+  autohandAIPlan?: 'cloud' | 'local';
   /** Port for local provider */
   port?: number;
 
@@ -288,6 +290,15 @@ export class Transport {
     const env: Record<string, string> = { ...process.env } as Record<string, string>;
     // Enable tool output streaming for SDK events
     env.AUTOHAND_STREAM_TOOL_OUTPUT = '1';
+    if (this.options.provider === 'autohandai') {
+      env.AUTOHAND_AI_PLAN = this.options.autohandAIPlan ?? 'cloud';
+      if (this.options.apiKey !== undefined) {
+        env.AUTOHAND_AI_API_KEY = this.options.apiKey;
+      }
+      if (this.options.baseUrl !== undefined) {
+        env.AUTOHAND_AI_BASE_URL = this.options.baseUrl;
+      }
+    }
     if (this.options.envVars) {
       for (const [key, value] of Object.entries(this.options.envVars)) {
         if (value !== undefined) {

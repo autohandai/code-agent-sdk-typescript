@@ -22,6 +22,20 @@ function captureErrorMessage(fn: () => void): string {
 }
 
 describe('SDK Configuration Options', () => {
+  it('accepts Autohand AI SDK cloud configuration with an API key', () => {
+    const sdk = new AutohandSDK({
+      cliPath: '/path/to/cli',
+      provider: 'autohandai',
+      model: 'fantail',
+      apiKey: 'ah-test-key',
+      autohandAIPlan: 'cloud',
+    });
+
+    expect(sdk.getConfig().provider).toBe('autohandai');
+    expect(sdk.getConfig().apiKey).toBe('ah-test-key');
+    expect(sdk.getConfig().autohandAIPlan).toBe('cloud');
+  });
+
   it('accepts permissions configuration', () => {
     const sdk = new AutohandSDK({
       cliPath: '/path/to/cli',
@@ -290,6 +304,27 @@ describe('Provider Configuration Validation', () => {
       cliPath: '/path/to/cli',
       model: 'openrouter/auto',
     }))).toBe("apiKey is required for provider 'openrouter'");
+  });
+
+  it('throws ProviderConfigError when apiKey is missing for Autohand AI SDK cloud provider', () => {
+    expect(captureErrorMessage(() => new AutohandSDK({
+      cliPath: '/path/to/cli',
+      provider: 'autohandai',
+      model: 'moa',
+      autohandAIPlan: 'cloud',
+    }))).toBe("apiKey is required for provider 'autohandai'");
+  });
+
+  it('does not require apiKey for Autohand AI SDK local provider config', () => {
+    const sdk = new AutohandSDK({
+      cliPath: '/path/to/cli',
+      provider: 'autohandai',
+      model: 'mlx-community/Qwen2.5-Coder-7B-Instruct-4bit',
+      autohandAIPlan: 'local',
+    });
+
+    expect(sdk.getConfig().autohandAIPlan).toBe('local');
+    expect(getTransportOptions(sdk).autohandAIPlan).toBe('local');
   });
 
   it('throws ProviderConfigError when apiKey is missing for cloud provider (zai)', () => {

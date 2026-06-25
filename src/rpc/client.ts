@@ -186,6 +186,7 @@ export class RPCClient {
       provider?: ProviderName | undefined;
       apiKey?: string;
       baseUrl?: string;
+      autohandAIPlan?: 'cloud' | 'local';
       port?: number;
       envVars?: import('../types/index.js').AutohandEnvVars;
       hooksEnabled?: boolean;
@@ -245,6 +246,7 @@ export class RPCClient {
     if (provider !== undefined) transportOptions.provider = provider;
     if (config.apiKey !== undefined) transportOptions.apiKey = config.apiKey;
     if (config.baseUrl !== undefined) transportOptions.baseUrl = config.baseUrl;
+    if (config.autohandAIPlan !== undefined) transportOptions.autohandAIPlan = config.autohandAIPlan;
     if (config.port !== undefined) transportOptions.port = config.port;
     if (config.envVars !== undefined) transportOptions.envVars = config.envVars;
     if (config.hooks?.enabled !== undefined) transportOptions.hooksEnabled = config.hooks.enabled;

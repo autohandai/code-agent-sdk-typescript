@@ -37,7 +37,7 @@ export type JsonRpcParams = Record<string, unknown> | unknown[];
 /**
  * Available providers in CLI-3
  */
-export type ProviderName = 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
+export type ProviderName = 'autohandai' | 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
 
 /**
  * AUTOHAND_ prefixed environment variables supported by CLI-3.
@@ -50,6 +50,12 @@ export interface AutohandEnvVars {
   AUTOHAND_API_URL?: string;
   /** Config file path override */
   AUTOHAND_CONFIG?: string;
+  /** Autohand AI API key for SDK Cloud usage */
+  AUTOHAND_AI_API_KEY?: string;
+  /** Autohand AI base URL override */
+  AUTOHAND_AI_BASE_URL?: string;
+  /** Autohand AI plan style (cloud or local) */
+  AUTOHAND_AI_PLAN?: string;
   /** Enable debug logging mode ('1' to enable) */
   AUTOHAND_DEBUG?: string;
   /** Client identifier for ACP extensions (e.g., 'zed', 'terminal') */
@@ -120,6 +126,11 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'vertexai':
     case 'nvidia':
       validateCloudProviderConfig(provider, config);
+      break;
+    case 'autohandai':
+      if (config.autohandAIPlan !== 'local') {
+        validateCloudProviderConfig(provider, config);
+      }
       break;
     case 'ollama':
     case 'llamacpp':
@@ -207,6 +218,10 @@ export function detectProviderFromModel(model: string): ProviderName {
   if (!model) return 'openrouter';
 
   const modelLower = model.toLowerCase();
+
+  if (modelLower === 'fantail' || modelLower === 'moa' || modelLower.startsWith('autohandai/')) {
+    return 'autohandai';
+  }
 
   // Zai models (glm-4.5, etc.)
   if (modelLower.includes('glm') || modelLower.includes('z-ai')) {
@@ -843,6 +858,9 @@ export async function loadWorkspaceConfig(workspaceRoot?: string): Promise<SDKCo
 function mergeEnvVariables(config: SDKConfig): SDKConfig {
   const merged = { ...config };
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+  const autohandAIApiKey = process.env.AUTOHAND_AI_API_KEY;
+  const autohandAIBaseUrl = process.env.AUTOHAND_AI_BASE_URL;
+  const autohandAIPlan = process.env.AUTOHAND_AI_PLAN;
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const azureApiKey = process.env.AZURE_API_KEY;
   const zaiApiKey = process.env.ZAI_API_KEY;
@@ -852,6 +870,16 @@ function mergeEnvVariables(config: SDKConfig): SDKConfig {
   const autohandModel = process.env.AUTOHAND_MODEL;
   
   // Provider-specific environment variables
+  if (autohandAIApiKey !== undefined && autohandAIApiKey !== '' && merged.apiKey === undefined) {
+    merged.apiKey = autohandAIApiKey;
+    merged.provider ??= 'autohandai';
+  }
+  if (autohandAIBaseUrl !== undefined && autohandAIBaseUrl !== '' && merged.baseUrl === undefined) {
+    merged.baseUrl = autohandAIBaseUrl;
+  }
+  if ((autohandAIPlan === 'cloud' || autohandAIPlan === 'local') && merged.autohandAIPlan === undefined) {
+    merged.autohandAIPlan = autohandAIPlan;
+  }
   if (openrouterApiKey !== undefined && openrouterApiKey !== '' && merged.apiKey === undefined) {
     merged.apiKey = openrouterApiKey;
   }
@@ -1008,6 +1036,8 @@ export interface SDKConfig {
   apiKey?: string;
   /** Base URL for the provider API */
   baseUrl?: string;
+  /** Autohand AI plan. SDK Cloud requires apiKey; Local delegates to CLI/local server config. */
+  autohandAIPlan?: 'cloud' | 'local';
 
   // OpenAI-specific options
   /** OpenAI authentication mode */
