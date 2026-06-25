@@ -1619,6 +1619,7 @@ export type HookEvent =
   | 'post-tool'
   | 'file-modified'
   | 'stop'
+  | 'post-response'
   | 'subagent-stop'
   | 'permission-request'
   | 'notification'
@@ -1655,6 +1656,49 @@ export type HookEvent =
   | 'context:overflow'
   | 'context:warning'
   | 'context:critical';
+
+/** Canonical hook event names accepted by the CLI */
+export const HOOK_EVENTS = [
+  'session-start',
+  'session-end',
+  'pre-clear',
+  'pre-prompt',
+  'pre-tool',
+  'post-tool',
+  'file-modified',
+  'stop',
+  'post-response',
+  'subagent-stop',
+  'permission-request',
+  'notification',
+  'session-error',
+  'automode:start',
+  'automode:iteration',
+  'automode:checkpoint',
+  'automode:pause',
+  'automode:resume',
+  'automode:cancel',
+  'automode:complete',
+  'automode:error',
+  'pre-learn',
+  'post-learn',
+  'team-created',
+  'teammate-spawned',
+  'teammate-idle',
+  'task-assigned',
+  'task-completed',
+  'team-shutdown',
+  'review:start',
+  'review:end',
+  'review:paused',
+  'review:failed',
+  'review:completed',
+  'mode-change',
+  'context:compact',
+  'context:overflow',
+  'context:warning',
+  'context:critical',
+] as const satisfies readonly HookEvent[];
 
 /** Filter to limit when a hook fires */
 export interface HookFilter {
@@ -1738,8 +1782,14 @@ export interface HookContext {
   mentionedFiles?: string[];
   /** Tokens used (for stop) */
   tokensUsed?: number;
+  /** Whether tokensUsed is actual provider-reported usage or unavailable */
+  tokensUsageStatus?: 'actual' | 'unavailable';
   /** Tool calls count (for stop) */
   toolCallsCount?: number;
+  /** Tool calls in this turn (for stop) */
+  toolCallsInTurn?: number;
+  /** Turn duration ms (for stop) */
+  turnDuration?: number;
   /** Error message (for session-error) */
   error?: string;
   /** Error code (for session-error) */
@@ -1766,6 +1816,56 @@ export interface HookContext {
   notificationType?: string;
   /** Notification message (for notification) */
   notificationMessage?: string;
+  /** Auto-mode session ID */
+  automodeSessionId?: string;
+  /** Auto-mode prompt/task */
+  automodePrompt?: string;
+  /** Auto-mode current iteration */
+  automodeIteration?: number;
+  /** Auto-mode max iterations */
+  automodeMaxIterations?: number;
+  /** Auto-mode actions in current iteration */
+  automodeActions?: string[];
+  /** Auto-mode files created */
+  automodeFilesCreated?: number;
+  /** Auto-mode files modified */
+  automodeFilesModified?: number;
+  /** Auto-mode cancel reason */
+  automodeCancelReason?: string;
+  /** Auto-mode checkpoint commit hash */
+  automodeCheckpointCommit?: string;
+  /** Auto-mode total cost */
+  automodeTotalCost?: number;
+  /** Review target path */
+  reviewPath?: string;
+  /** Review scope */
+  reviewScope?: string;
+  /** Review instructions/focus */
+  reviewInstructions?: string;
+  /** Review error message */
+  reviewError?: string;
+  /** Team name */
+  teamName?: string;
+  /** Teammate name */
+  teammateName?: string;
+  /** Teammate agent definition name */
+  teammateAgentName?: string;
+  /** Teammate process ID */
+  teammatePid?: number;
+  /** Team task ID */
+  teamTaskId?: string;
+  /** Team task owner */
+  teamTaskOwner?: string;
+  /** Team task result */
+  teamTaskResult?: string;
+  /** Total team members */
+  teamMemberCount?: number;
+  /** Completed tasks count */
+  teamTasksCompleted?: number;
+  /** Total tasks count */
+  teamTasksTotal?: number;
+  /** Additional workspace directories */
+  additionalWorkspaces?: string[];
 }
 
 /** Result of hook execution */

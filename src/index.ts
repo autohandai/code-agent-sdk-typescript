@@ -109,6 +109,7 @@ export { loadAgentsMd, createDefaultAgentsMd } from './types/index.js';
 /**
  * Hooks types and helpers (matching CLI-3 HookManager)
  */
+export { HOOK_EVENTS } from './types/index.js';
 export type {
   HookEvent,
   HookDefinition,

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { AutohandSDK } from '../index.js';
-import type { SDKEvent } from '../types/index.js';
+import { HOOK_EVENTS, type SDKEvent } from '../types/index.js';
 
 describe('SDK Stats Methods', () => {
   let sdk: AutohandSDK;
@@ -30,6 +30,15 @@ describe('SDK Stats Methods', () => {
     // Verify the method exists and has the correct signature
     expect(sdk.getSessionMetadata).toBeDefined();
     expect(typeof sdk.getSessionMetadata).toBe('function');
+  });
+});
+
+describe('Hook Events Contract', () => {
+  it('includes current CLI hook event names and compatibility aliases', () => {
+    expect(HOOK_EVENTS).toContain('post-response');
+    expect(HOOK_EVENTS).toContain('teammate-spawned');
+    expect(HOOK_EVENTS).toContain('context:critical');
+    expect(HOOK_EVENTS).toContain('automode:checkpoint');
   });
 });
 

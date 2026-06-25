@@ -23,10 +23,14 @@ Both accept file paths or inline strings.
 Hooks let you intercept tool calls and inject custom behavior.
 
 ```typescript
+import { HOOK_EVENTS } from '@autohandai/agent-sdk';
+
 await sdk.addHook({
   event: 'pre-tool',
   command: 'echo "About to run: {{tool}}"',
 });
+
+console.log(`Supported hook events: ${HOOK_EVENTS.join(', ')}`);
 ```
 
 List, toggle, and remove hooks at runtime:
