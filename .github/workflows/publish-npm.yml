@@ -265,21 +265,18 @@ jobs:
 
           package_name="$(node -p "require('./package.json').name")"
           npm_user="$(npm whoami)"
-          npm access ls-packages "$npm_user" --json \
-            | node -e "
-              let input = '';
-              process.stdin.on('data', chunk => input += chunk);
-              process.stdin.on('end', () => {
-                const packageName = process.argv[1];
-                const packages = JSON.parse(input || '{}');
-                const permission = packages[packageName];
+          access_json="$(npm access list packages "$npm_user" --json)"
 
-                if (!permission || !String(permission).toLowerCase().includes('write')) {
-                  console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
-                  process.exit(1);
-                }
-              });
-            " "$package_name" "$npm_user"
+          ACCESS_JSON="$access_json" node -e "
+            const packageName = process.argv[1];
+            const packages = JSON.parse(process.env.ACCESS_JSON || '{}');
+            const permission = packages[packageName];
+
+            if (!permission || !String(permission).toLowerCase().includes('write')) {
+              console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
+              process.exit(1);
+            }
+          " "$package_name" "$npm_user"
 
       - name: Validate package
         run: bun run prepublishOnly
@@ -381,21 +378,18 @@ jobs:
 
           package_name="$(node -p "require('./package.json').name")"
           npm_user="$(npm whoami)"
-          npm access ls-packages "$npm_user" --json \
-            | node -e "
-              let input = '';
-              process.stdin.on('data', chunk => input += chunk);
-              process.stdin.on('end', () => {
-                const packageName = process.argv[1];
-                const packages = JSON.parse(input || '{}');
-                const permission = packages[packageName];
+          access_json="$(npm access list packages "$npm_user" --json)"
 
-                if (!permission || !String(permission).toLowerCase().includes('write')) {
-                  console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
-                  process.exit(1);
-                }
-              });
-            " "$package_name" "$npm_user"
+          ACCESS_JSON="$access_json" node -e "
+            const packageName = process.argv[1];
+            const packages = JSON.parse(process.env.ACCESS_JSON || '{}');
+            const permission = packages[packageName];
+
+            if (!permission || !String(permission).toLowerCase().includes('write')) {
+              console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
+              process.exit(1);
+            }
+          " "$package_name" "$npm_user"
 
       - name: Validate package
         run: bun run prepublishOnly
