@@ -16,6 +16,20 @@ Secret name:
 
 `NPM_TOKEN`
 
+## Release Creation
+
+Use the `Release SDK` workflow to ship a new public version.
+
+The workflow:
+
+1. Restores the bundled CLI binaries from Git LFS.
+2. Bumps `package.json` and `package-lock.json` using either an explicit version or a patch, minor, major, or prerelease bump.
+3. Runs the package validation gate.
+4. Builds the npm tarball, verifies that `README.md` is present, and uploads the tarball plus SHA-256 checksum to the GitHub release.
+5. Commits the version bump, tags `vX.Y.Z`, pushes both to `main`, and creates the GitHub release.
+
+Publishing to npm is handled by the `Package CI and npm release` workflow after the GitHub release is published.
+
 ## Workflow Modes
 
 The `Package CI and npm release` workflow supports four manual modes:
@@ -31,10 +45,10 @@ Dependabot is configured for npm dependencies and GitHub Actions. Its pull reque
 
 ## Release Flow
 
-1. Update `package.json` and `package-lock.json` to the new version.
-2. Commit and push the version change to `main`.
-3. Create and publish a GitHub release tagged as either `vX.Y.Z` or `X.Y.Z`, matching the package version exactly.
-4. The `Package CI and npm release` workflow validates the package, checks that the npm version is not already published, previews the packed files, and publishes with npm provenance.
+1. Run `Release SDK` from the Actions tab.
+2. Choose a bump type or provide an explicit version.
+3. Wait for it to create the version commit, tag, GitHub release, npm tarball, and checksum.
+4. Confirm the triggered `Package CI and npm release` run publishes the new npm version with provenance.
 
 Prerelease GitHub releases publish under the `next` npm dist-tag. Normal GitHub releases publish under `latest`.
 

@@ -108,6 +108,11 @@ jobs:
       - name: Preview package contents
         run: npm pack --dry-run
 
+      - name: Verify README is packaged
+        run: |
+          npm pack --dry-run --json \
+            | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const files = JSON.parse(input)[0].files.map(file => file.path); if (!files.includes('README.md')) { console.error('README.md is missing from the npm package.'); process.exit(1); } });"
+
       - name: Verify package size budget
         run: |
           package_size="$(
