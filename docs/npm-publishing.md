@@ -11,10 +11,10 @@ Configure a trusted publisher for `@autohandai/agent-sdk` in npm package setting
 - Publisher: GitHub Actions
 - Organization or user: `autohandai`
 - Repository: `code-agent-sdk-typescript`
-- Workflow file: `.github/workflows/release.yml`
+- Workflow filename: `release.yml`
 - Allowed action: `npm publish`
 
-The manual `Package CI and npm release` publish modes also use OIDC. If those recovery paths need to publish directly, add `.github/workflows/publish-npm.yml` as a trusted publisher too.
+The manual `Package CI and npm release` publish modes also use OIDC. If those recovery paths need to publish directly, add `publish-npm.yml` as a trusted publisher too.
 
 ## Release Creation
 
