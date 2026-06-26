@@ -4,7 +4,9 @@ The TypeScript SDK validates, tests, canary-publishes, and releases the public n
 
 ## Publishing Authentication
 
-The release workflows use npm Trusted Publishing through GitHub OIDC instead of a long-lived npm token.
+The release workflows use the `NPM_TOKEN` repository secret when it is configured. The token must be a current npm token that can publish `@autohandai/agent-sdk`; for npm accounts with two-factor authentication enabled, use a granular access token with publish access and 2FA bypass for automation.
+
+The workflows also keep GitHub OIDC enabled so npm Trusted Publishing can be used instead of a token.
 
 Configure a trusted publisher for `@autohandai/agent-sdk` in npm package settings:
 
@@ -18,16 +20,21 @@ The manual `Package CI and npm release` publish modes also use OIDC. If those re
 
 ## Release Creation
 
-Use the `Release SDK` workflow to ship a new public version.
+The `Release SDK` workflow is the canonical release path.
 
 The workflow:
 
 1. Restores the bundled CLI binaries from Git LFS.
-2. Bumps `package.json` and `package-lock.json` using either an explicit version or a patch, minor, major, or prerelease bump.
-3. Runs the package validation gate.
-4. Builds the npm tarball, verifies that `README.md` is present, and uploads the tarball plus SHA-256 checksum to the GitHub release.
-5. Commits the version bump, tags `vX.Y.Z`, pushes both to `main`, and creates the GitHub release.
-6. Publishes the same packed tarball to npm with provenance.
+2. Resolves the next version.
+3. Prepends `CHANGELOG.md` with generated release notes from git commits.
+4. Runs the package validation gate.
+5. Builds the npm tarball, verifies that `README.md` and `CHANGELOG.md` are present, and uploads the tarball plus SHA-256 checksum to the GitHub release.
+6. Commits the version/changelog update, tags the release, and creates the GitHub release.
+7. Publishes the same packed tarball to npm with provenance.
+
+Pushes to `main` automatically create bleeding-edge alpha releases from the latest stable base version, for example `v1.0.1-alpha.123.abcd123`, and publish them under the `alpha` npm dist-tag.
+
+Manual runs create stable releases such as `v1.0.2` and publish them under the selected dist-tag, normally `latest`.
 
 ## Workflow Modes
 
@@ -44,10 +51,14 @@ Dependabot is configured for npm dependencies and GitHub Actions. Its pull reque
 
 ## Release Flow
 
+For bleeding-edge alpha releases, merge or push to `main`. The release workflow skips its own `chore(release): ...` commits to avoid a release loop.
+
+For a stable release:
+
 1. Run `Release SDK` from the Actions tab.
-2. Choose a bump type or provide an explicit version.
-3. Select the npm dist-tag. Prerelease runs automatically switch `latest` to `next`.
-4. Wait for it to create the version commit, tag, GitHub release, npm tarball, checksum, and npm publish.
+2. Choose a stable bump type or provide an explicit version.
+3. Select the npm dist-tag, normally `latest`.
+4. Wait for it to create the version commit, changelog entry, tag, GitHub release, npm tarball, checksum, and npm publish.
 
 If a GitHub release already exists but npm publishing was blocked before upload, rerun `Release SDK` with `publish_existing` enabled. The version must match `package.json`, and the workflow will skip the commit, tag, and GitHub release creation steps while still validating and publishing the current package.
 
@@ -59,7 +70,7 @@ The workflow also restores Git LFS assets and fails before publishing if any bun
 
 The workflow can also be run manually from the Actions tab. Manual `release` mode uses the current `package.json` version and the selected npm dist-tag. Manual `canary` mode does not change git history; it creates a temporary prerelease package version inside the workflow run.
 
-Publishing modes require npm Trusted Publishing to be configured for the workflow that performs the publish. `validate` and `test` modes do not require npm publishing credentials.
+Publishing modes require either a valid `NPM_TOKEN` secret or npm Trusted Publishing to be configured for the workflow that performs the publish. `validate` and `test` modes do not require npm publishing credentials.
 
 ## Validation Gate
 

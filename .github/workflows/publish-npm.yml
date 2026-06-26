@@ -7,9 +7,6 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
   workflow_dispatch:
     inputs:
       mode:
@@ -213,6 +210,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Setup Bun
@@ -239,6 +237,17 @@ jobs:
           if npm view "$package_name@$CANARY_VERSION" version >/dev/null 2>&1; then
             echo "::error::$package_name@$CANARY_VERSION is already published on npm."
             exit 1
+          fi
+
+      - name: Configure npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            npm whoami
+          else
+            echo "NPM_TOKEN is not configured; falling back to npm Trusted Publishing if configured."
           fi
 
       - name: Validate package
@@ -270,7 +279,7 @@ jobs:
     needs:
       - validate
       - test
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'release')
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -292,6 +301,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Setup Bun
@@ -302,17 +312,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify release tag matches package version
-        if: github.event_name == 'release'
-        run: |
-          package_version="$(node -p "require('./package.json').version")"
-          release_tag="${{ github.event.release.tag_name }}"
-
-          if [ "$release_tag" != "v$package_version" ] && [ "$release_tag" != "$package_version" ]; then
-            echo "::error::Release tag '$release_tag' must match package version '$package_version' or 'v$package_version'."
-            exit 1
-          fi
-
       - name: Verify package version is unpublished
         run: |
           package_name="$(node -p "require('./package.json').name")"
@@ -321,6 +320,17 @@ jobs:
           if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
             echo "::error::$package_name@$package_version is already published on npm."
             exit 1
+          fi
+
+      - name: Configure npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            npm whoami
+          else
+            echo "NPM_TOKEN is not configured; falling back to npm Trusted Publishing if configured."
           fi
 
       - name: Validate package
@@ -364,13 +374,7 @@ jobs:
       - name: Resolve npm dist-tag
         id: dist-tag
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.dist_tag }}"
-          elif [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            tag="next"
-          else
-            tag="latest"
-          fi
+          tag="${{ inputs.dist_tag }}"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 

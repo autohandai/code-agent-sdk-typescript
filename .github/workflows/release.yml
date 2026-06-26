@@ -1,10 +1,13 @@
 name: Release SDK
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       bump:
-        description: Version bump when version is empty
+        description: Stable version bump when version is empty
         required: true
         default: patch
         type: choice
@@ -12,28 +15,17 @@ on:
           - patch
           - minor
           - major
-          - prerelease
       version:
-        description: Explicit version, for example 1.0.1
+        description: Explicit stable version, for example 1.0.2
         required: false
         type: string
-      prerelease_identifier:
-        description: Prerelease identifier for prerelease bumps
-        required: false
-        default: beta
-        type: string
-      prerelease:
-        description: Mark the GitHub release as prerelease
-        required: true
-        default: false
-        type: boolean
       publish_existing:
         description: Publish current version when the GitHub release already exists
         required: true
         default: false
         type: boolean
       dist_tag:
-        description: npm distribution tag
+        description: npm distribution tag for manual stable releases
         required: true
         default: latest
         type: choice
@@ -56,9 +48,10 @@ concurrency:
 
 jobs:
   release:
-    name: Create versioned GitHub release
+    name: Release SDK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')
 
     steps:
       - name: Checkout
@@ -77,6 +70,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Setup Bun
@@ -87,17 +81,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Resolve and bump package version
+      - name: Resolve release version
         id: version
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           VERSION_INPUT: ${{ inputs.version }}
           BUMP_INPUT: ${{ inputs.bump }}
-          PREID_INPUT: ${{ inputs.prerelease_identifier }}
+          DIST_TAG_INPUT: ${{ inputs.dist_tag }}
+          PUBLISH_EXISTING_INPUT: ${{ inputs.publish_existing }}
         run: |
           set -euo pipefail
 
-          if [ "${{ inputs.publish_existing }}" = "true" ]; then
+          publish_existing="${PUBLISH_EXISTING_INPUT:-false}"
+          latest_stable_tag="$(
+            git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | head -n 1 || true
+          )"
+
+          if [ -n "$latest_stable_tag" ]; then
+            stable_base="${latest_stable_tag#v}"
+          else
+            stable_base="$(node -p "require('./package.json').version.split('-')[0]")"
+          fi
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            short_sha="$(printf '%.7s' "$GITHUB_SHA")"
+            version="${stable_base}-alpha.${GITHUB_RUN_NUMBER}.${short_sha}"
+            release_kind="alpha"
+            prerelease="true"
+            dist_tag="alpha"
+            npm version "$version" --no-git-tag-version --allow-same-version
+          elif [ "$publish_existing" = "true" ]; then
             version="${VERSION_INPUT#v}"
             if [ -z "$version" ]; then
               version="$(node -p "require('./package.json').version")"
@@ -108,15 +124,40 @@ jobs:
               echo "::error::publish_existing version '$version' must match package.json version '$package_version'."
               exit 1
             fi
-          elif [ -n "$VERSION_INPUT" ]; then
-            version="${VERSION_INPUT#v}"
-            npm version "$version" --no-git-tag-version --allow-same-version
-          elif [ "$BUMP_INPUT" = "prerelease" ]; then
-            npm version prerelease --preid "${PREID_INPUT:-beta}" --no-git-tag-version
-            version="$(node -p "require('./package.json').version")"
+
+            release_kind="existing"
+            prerelease="$([[ "$version" == *-* ]] && echo true || echo false)"
+            dist_tag="${DIST_TAG_INPUT:-latest}"
           else
-            npm version "$BUMP_INPUT" --no-git-tag-version
-            version="$(node -p "require('./package.json').version")"
+            if [ -n "$VERSION_INPUT" ]; then
+              version="${VERSION_INPUT#v}"
+            else
+              IFS=. read -r major minor patch <<< "$stable_base"
+              case "${BUMP_INPUT:-patch}" in
+                major)
+                  major=$((major + 1))
+                  minor=0
+                  patch=0
+                  ;;
+                minor)
+                  minor=$((minor + 1))
+                  patch=0
+                  ;;
+                patch)
+                  patch=$((patch + 1))
+                  ;;
+                *)
+                  echo "::error::Unsupported stable bump '${BUMP_INPUT:-patch}'."
+                  exit 1
+                  ;;
+              esac
+              version="${major}.${minor}.${patch}"
+            fi
+
+            release_kind="stable"
+            prerelease="false"
+            dist_tag="${DIST_TAG_INPUT:-latest}"
+            npm version "$version" --no-git-tag-version --allow-same-version
           fi
 
           if ! node -e "const semver = process.argv[1]; if (!/^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(semver)) process.exit(1)" "$version"; then
@@ -126,6 +167,75 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "release_kind=$release_kind" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "publish_existing=$publish_existing" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "latest_stable_tag=$latest_stable_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Update changelog
+        if: steps.version.outputs.publish_existing != 'true'
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.version.outputs.version }}"
+          tag="${{ steps.version.outputs.tag }}"
+          latest_stable_tag="${{ steps.version.outputs.latest_stable_tag }}"
+          release_kind="${{ steps.version.outputs.release_kind }}"
+          date="$(date -u +%Y-%m-%d)"
+          range=""
+
+          if [ -n "$latest_stable_tag" ]; then
+            range="${latest_stable_tag}..HEAD"
+          fi
+
+          {
+            echo "## ${tag} - ${date}"
+            echo
+            if [ "$release_kind" = "alpha" ]; then
+              echo "> Bleeding edge alpha build from main."
+            else
+              echo "> Stable release."
+            fi
+            echo
+            echo "### Changes"
+            echo
+            if [ -n "$range" ]; then
+              git log "$range" --pretty=format:'- %s (%h)' --no-merges \
+                | grep -v '^.*chore(release):' || true
+            else
+              git log -n 20 --pretty=format:'- %s (%h)' --no-merges \
+                | grep -v '^.*chore(release):' || true
+            fi
+          } > release-notes.md
+
+          if ! grep -q '^- ' release-notes.md; then
+            printf -- '- Maintenance release.\n' >> release-notes.md
+          fi
+
+          printf '\n' >> release-notes.md
+
+          if [ -f CHANGELOG.md ] && head -n 1 CHANGELOG.md | grep -qx '# Changelog'; then
+            {
+              echo "# Changelog"
+              echo
+              cat release-notes.md
+              tail -n +2 CHANGELOG.md | sed '/./,$!d'
+            } > CHANGELOG.md.tmp
+          else
+            {
+              echo "# Changelog"
+              echo
+              cat release-notes.md
+              if [ -f CHANGELOG.md ]; then
+                cat CHANGELOG.md
+              fi
+            } > CHANGELOG.md.tmp
+          fi
+
+          mv CHANGELOG.md.tmp CHANGELOG.md
 
       - name: Verify version is unpublished
         run: |
@@ -137,7 +247,7 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ inputs.publish_existing }}" != "true" ] && git ls-remote --exit-code --tags origin "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+          if [ "${{ steps.version.outputs.publish_existing }}" != "true" ] && git ls-remote --exit-code --tags origin "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             echo "::error::Tag ${{ steps.version.outputs.tag }} already exists on origin."
             exit 1
           fi
@@ -153,55 +263,53 @@ jobs:
           )"
 
           tar -tzf "$package_file" | grep -qx "package/README.md"
+          tar -tzf "$package_file" | grep -qx "package/CHANGELOG.md"
           tar -xOf "$package_file" package/README.md | grep -q "Other Programming Languages"
           shasum -a 256 "$package_file" > "$package_file.sha256"
           echo "PACKAGE_FILE=$package_file" >> "$GITHUB_ENV"
 
-      - name: Commit version bump
-        if: ${{ !inputs.publish_existing }}
+      - name: Configure npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            npm whoami
+          else
+            echo "NPM_TOKEN is not configured; falling back to npm Trusted Publishing if configured."
+          fi
+
+      - name: Commit version and changelog
+        if: steps.version.outputs.publish_existing != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore(release): v${{ steps.version.outputs.version }}"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): ${{ steps.version.outputs.tag }}"
 
       - name: Tag release
-        if: ${{ !inputs.publish_existing }}
+        if: steps.version.outputs.publish_existing != 'true'
         run: git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
 
       - name: Push version and tag
-        if: ${{ !inputs.publish_existing }}
+        if: steps.version.outputs.publish_existing != 'true'
         run: |
           git push origin HEAD:main
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Create GitHub release
-        if: ${{ !inputs.publish_existing }}
+        if: steps.version.outputs.publish_existing != 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
-          body: |
-            Release for `@autohandai/agent-sdk` `${{ steps.version.outputs.version }}`.
-
-            The npm package is published by the `Package CI and npm release` workflow when this GitHub release is published.
-          prerelease: ${{ inputs.prerelease }}
+          name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             *.tgz
             *.tgz.sha256
 
-      - name: Resolve npm dist-tag
-        id: dist-tag
-        run: |
-          tag="${{ inputs.dist_tag }}"
-
-          if [ "${{ inputs.prerelease }}" = "true" ] && [ "$tag" = "latest" ]; then
-            tag="next"
-          fi
-
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Publish to npm
         run: |
           npm install -g npm@latest
-          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
+          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.version.outputs.dist_tag }}"
