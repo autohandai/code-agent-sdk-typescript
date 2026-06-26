@@ -2,19 +2,19 @@
 
 The TypeScript SDK validates, tests, canary-publishes, and releases the public npm package `@autohandai/agent-sdk` from GitHub Actions.
 
-## Required Secret
+## Publishing Authentication
 
-Add an npm automation token as a repository secret named `NPM_TOKEN`.
+The release workflows use npm Trusted Publishing through GitHub OIDC instead of a long-lived npm token.
 
-Use a token that can publish `@autohandai/agent-sdk`. For npm accounts with two-factor authentication enabled, use an automation token or a granular access token that supports automated package publishing.
+Configure a trusted publisher for `@autohandai/agent-sdk` in npm package settings:
 
-Repository path:
+- Publisher: GitHub Actions
+- Organization or user: `autohandai`
+- Repository: `code-agent-sdk-typescript`
+- Workflow file: `.github/workflows/release.yml`
+- Allowed action: `npm publish`
 
-`Settings -> Secrets and variables -> Actions -> New repository secret`
-
-Secret name:
-
-`NPM_TOKEN`
+The manual `Package CI and npm release` publish modes also use OIDC. If those recovery paths need to publish directly, add `.github/workflows/publish-npm.yml` as a trusted publisher too.
 
 ## Release Creation
 
@@ -38,7 +38,7 @@ The `Package CI and npm release` workflow supports four manual modes:
 - `canary`: runs `validate` and `test`, creates a temporary `X.Y.Z-canary.RUN.shaSHA` package version, and publishes it under the `canary` dist-tag.
 - `release`: runs `validate` and `test`, verifies the package version is unpublished, and publishes the current package version to npm.
 
-Pull requests and pushes to `main` automatically run validation and tests without requiring `NPM_TOKEN`.
+Pull requests and pushes to `main` automatically run validation and tests without publishing credentials.
 
 Dependabot is configured for npm dependencies and GitHub Actions. Its pull requests run the same validation and test gates, and dependency-update PRs also build and upload a short-lived npm package artifact so the updated dependency set is inspectable before merge. Release runs build the packed npm tarball, upload it with a SHA-256 checksum, and publish that exact artifact to npm.
 
@@ -57,7 +57,7 @@ The workflow also restores Git LFS assets and fails before publishing if any bun
 
 The workflow can also be run manually from the Actions tab. Manual `release` mode uses the current `package.json` version and the selected npm dist-tag. Manual `canary` mode does not change git history; it creates a temporary prerelease package version inside the workflow run.
 
-Publishing modes require the `NPM_TOKEN` secret. `validate` and `test` modes do not.
+Publishing modes require npm Trusted Publishing to be configured for the workflow that performs the publish. `validate` and `test` modes do not require npm publishing credentials.
 
 ## Validation Gate
 

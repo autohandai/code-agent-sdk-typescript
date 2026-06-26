@@ -71,8 +71,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 24
           cache: npm
 
       - name: Setup Bun
@@ -126,17 +125,6 @@ jobs:
             echo "::error::Tag ${{ steps.version.outputs.tag }} already exists on origin."
             exit 1
           fi
-
-      - name: Validate npm token
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before releasing."
-            exit 1
-          fi
-
-          npm whoami
 
       - name: Validate package
         run: bun run prepublishOnly
@@ -194,6 +182,6 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
+        run: |
+          npm install -g npm@latest
+          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"

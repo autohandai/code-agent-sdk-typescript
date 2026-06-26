@@ -197,8 +197,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -214,8 +212,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 24
           cache: npm
 
       - name: Setup Bun
@@ -225,15 +222,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Validate npm token
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before publishing."
-            exit 1
-          fi
-
-          npm whoami
 
       - name: Create canary version
         run: |
@@ -273,7 +261,9 @@ jobs:
           fi
 
       - name: Publish canary package
-        run: npm publish --access public --provenance --tag canary
+        run: |
+          npm install -g npm@latest
+          npm publish --access public --provenance --tag canary
 
   publish_release:
     name: Publish npm release
@@ -286,8 +276,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -303,8 +291,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 24
           cache: npm
 
       - name: Setup Bun
@@ -314,15 +301,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Validate npm token
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before publishing."
-            exit 1
-          fi
-
-          npm whoami
 
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
@@ -397,4 +375,6 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Publish release package
-        run: npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
+        run: |
+          npm install -g npm@latest
+          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
