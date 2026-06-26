@@ -49,6 +49,8 @@ Dependabot is configured for npm dependencies and GitHub Actions. Its pull reque
 3. Select the npm dist-tag. Prerelease runs automatically switch `latest` to `next`.
 4. Wait for it to create the version commit, tag, GitHub release, npm tarball, checksum, and npm publish.
 
+If a GitHub release already exists but npm publishing was blocked before upload, rerun `Release SDK` with `publish_existing` enabled. The version must match `package.json`, and the workflow will skip the commit, tag, and GitHub release creation steps while still validating and publishing the current package.
+
 Prerelease GitHub releases publish under the `next` npm dist-tag. Normal GitHub releases publish under `latest`.
 
 The workflow also restores Git LFS assets and fails before publishing if any bundled CLI file is still a Git LFS pointer instead of a real binary. The packed npm tarball must stay under the 250 MiB release budget.
