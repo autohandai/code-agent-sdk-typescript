@@ -27,8 +27,7 @@ The workflow:
 3. Runs the package validation gate.
 4. Builds the npm tarball, verifies that `README.md` is present, and uploads the tarball plus SHA-256 checksum to the GitHub release.
 5. Commits the version bump, tags `vX.Y.Z`, pushes both to `main`, and creates the GitHub release.
-
-Publishing to npm is handled by the `Package CI and npm release` workflow after the GitHub release is published.
+6. Publishes the same packed tarball to npm with provenance.
 
 ## Workflow Modes
 
@@ -47,8 +46,8 @@ Dependabot is configured for npm dependencies and GitHub Actions. Its pull reque
 
 1. Run `Release SDK` from the Actions tab.
 2. Choose a bump type or provide an explicit version.
-3. Wait for it to create the version commit, tag, GitHub release, npm tarball, and checksum.
-4. Confirm the triggered `Package CI and npm release` run publishes the new npm version with provenance.
+3. Select the npm dist-tag. Prerelease runs automatically switch `latest` to `next`.
+4. Wait for it to create the version commit, tag, GitHub release, npm tarball, checksum, and npm publish.
 
 Prerelease GitHub releases publish under the `next` npm dist-tag. Normal GitHub releases publish under `latest`.
 

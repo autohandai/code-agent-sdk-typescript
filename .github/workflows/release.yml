@@ -27,9 +27,20 @@ on:
         required: true
         default: false
         type: boolean
+      dist_tag:
+        description: npm distribution tag
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+          - alpha
 
 permissions:
   contents: write
+  id-token: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -61,6 +72,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 20
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Setup Bun
@@ -115,6 +127,17 @@ jobs:
             exit 1
           fi
 
+      - name: Validate npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not configured. Add it as a repository secret before releasing."
+            exit 1
+          fi
+
+          npm whoami
+
       - name: Validate package
         run: bun run prepublishOnly
 
@@ -158,3 +181,19 @@ jobs:
           files: |
             *.tgz
             *.tgz.sha256
+
+      - name: Resolve npm dist-tag
+        id: dist-tag
+        run: |
+          tag="${{ inputs.dist_tag }}"
+
+          if [ "${{ inputs.prerelease }}" = "true" ] && [ "$tag" = "latest" ]; then
+            tag="next"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
