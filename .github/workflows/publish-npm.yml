@@ -244,11 +244,42 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
-            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$npmrc"
+            chmod 0600 "$npmrc"
             npm whoami
           else
             echo "NPM_TOKEN is not configured; falling back to npm Trusted Publishing if configured."
           fi
+
+      - name: Verify npm publish access
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "Skipping token permission preflight because NPM_TOKEN is not configured."
+            exit 0
+          fi
+
+          package_name="$(node -p "require('./package.json').name")"
+          npm_user="$(npm whoami)"
+          npm access ls-packages "$npm_user" --json \
+            | node -e "
+              let input = '';
+              process.stdin.on('data', chunk => input += chunk);
+              process.stdin.on('end', () => {
+                const packageName = process.argv[1];
+                const packages = JSON.parse(input || '{}');
+                const permission = packages[packageName];
+
+                if (!permission || !String(permission).toLowerCase().includes('write')) {
+                  console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
+                  process.exit(1);
+                }
+              });
+            " "$package_name" "$npm_user"
 
       - name: Validate package
         run: bun run prepublishOnly
@@ -270,6 +301,8 @@ jobs:
           fi
 
       - name: Publish canary package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm install -g npm@latest
           npm publish --access public --provenance --tag canary
@@ -327,11 +360,42 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
-            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$npmrc"
+            chmod 0600 "$npmrc"
             npm whoami
           else
             echo "NPM_TOKEN is not configured; falling back to npm Trusted Publishing if configured."
           fi
+
+      - name: Verify npm publish access
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "Skipping token permission preflight because NPM_TOKEN is not configured."
+            exit 0
+          fi
+
+          package_name="$(node -p "require('./package.json').name")"
+          npm_user="$(npm whoami)"
+          npm access ls-packages "$npm_user" --json \
+            | node -e "
+              let input = '';
+              process.stdin.on('data', chunk => input += chunk);
+              process.stdin.on('end', () => {
+                const packageName = process.argv[1];
+                const packages = JSON.parse(input || '{}');
+                const permission = packages[packageName];
+
+                if (!permission || !String(permission).toLowerCase().includes('write')) {
+                  console.error(packageName + ' is not writable by the configured NPM_TOKEN account. Update the npm granular token so user ' + process.argv[2] + ' has publish/write access to this package.');
+                  process.exit(1);
+                }
+              });
+            " "$package_name" "$npm_user"
 
       - name: Validate package
         run: bun run prepublishOnly
@@ -379,6 +443,8 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Publish release package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm install -g npm@latest
           npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"

@@ -4,7 +4,9 @@ The TypeScript SDK validates, tests, canary-publishes, and releases the public n
 
 ## Publishing Authentication
 
-The release workflows use the `NPM_TOKEN` repository secret when it is configured. The token must be a current npm token that can publish `@autohandai/agent-sdk`; for npm accounts with two-factor authentication enabled, use a granular access token with publish access and 2FA bypass for automation.
+The release workflows use the `NPM_TOKEN` repository secret when it is configured. The token must be a current npm token for a user with write/publish access to `@autohandai/agent-sdk`; for npm accounts with two-factor authentication enabled, use a granular access token with publish access and 2FA bypass for automation.
+
+The workflows run `npm whoami` and a package access preflight before publishing. If npm returns `E404 Not Found` during publish for an existing scoped package, the token is authenticated but does not have write access to that package/scope.
 
 The workflows also keep GitHub OIDC enabled so npm Trusted Publishing can be used instead of a token.
 
@@ -29,8 +31,8 @@ The workflow:
 3. Prepends `CHANGELOG.md` with generated release notes from git commits.
 4. Runs the package validation gate.
 5. Builds the npm tarball, verifies that `README.md` and `CHANGELOG.md` are present, and uploads the tarball plus SHA-256 checksum to the GitHub release.
-6. Commits the version/changelog update, tags the release, and creates the GitHub release.
-7. Publishes the same packed tarball to npm with provenance.
+6. Commits the version/changelog update and tags the release locally.
+7. Publishes the same packed tarball to npm with provenance, then pushes the release commit/tag and creates the GitHub release.
 
 Pushes to `main` automatically create bleeding-edge alpha releases from the latest stable base version, for example `v1.0.1-alpha.123.abcd123`, and publish them under the `alpha` npm dist-tag.
 
