@@ -1478,6 +1478,66 @@ export type GoalSnapshotResult = GoalSnapshot | GoalFeatureDisabledResult;
 export type GoalMutationRpcResult = GoalMutationResult | GoalFeatureDisabledResult;
 export type GoalTemplatesResult = GoalTemplateMetadata[] | GoalFeatureDisabledResult;
 
+export type AutoresearchOptimizationDirection = 'lower' | 'higher';
+
+export interface AutoresearchSubagentOptions {
+  ideaGeneration?: boolean;
+  measurementAnalysis?: boolean;
+  finalization?: boolean;
+}
+
+export interface AutoresearchStartParams {
+  objective: string;
+  maxIterations?: number;
+  timeoutMs?: number;
+  metricName?: string;
+  metricUnit?: string;
+  direction?: AutoresearchOptimizationDirection;
+  measureCommand?: string;
+  measureScript?: string;
+  checksCommand?: string;
+  checksScript?: string;
+  filesInScope?: string[];
+  subagents?: AutoresearchSubagentOptions;
+}
+
+export interface AutoresearchState {
+  active: boolean;
+  goal: string;
+  iteration: number;
+  maxIterations: number;
+}
+
+export interface AutoresearchStartResult {
+  success: boolean;
+  message?: string;
+  instruction?: string;
+  active?: boolean;
+  state?: AutoresearchState;
+  statusText?: string;
+  runsLogged?: number;
+  error?: string;
+}
+
+export interface AutoresearchStatusResult {
+  success: boolean;
+  active: boolean;
+  state?: AutoresearchState;
+  statusText: string;
+  runsLogged: number;
+  error?: string;
+}
+
+export interface AutoresearchStopResult {
+  success: boolean;
+  message?: string;
+  active?: boolean;
+  state?: AutoresearchState;
+  statusText?: string;
+  runsLogged?: number;
+  error?: string;
+}
+
 export interface PromptParams {
   message: string;
   context?: {
@@ -1688,7 +1748,22 @@ export type SDKEvent =
   | ToolEndEvent
   | FileModifiedEvent
   | PermissionRequestEvent
+  | AutoresearchEvent
   | ErrorEvent;
+
+export interface AutoresearchEvent {
+  type: 'autoresearch';
+  phase: 'start' | 'status' | 'pause';
+  active: boolean;
+  goal?: string;
+  iteration?: number;
+  maxIterations?: number;
+  runsLogged: number;
+  statusText: string;
+  subcommand: 'start' | 'resume' | 'status' | 'stop';
+  message?: string;
+  timestamp: string;
+}
 
 export interface AgentStartEvent {
   type: 'agent_start';
@@ -1841,6 +1916,16 @@ export type HookEvent =
   | 'automode:cancel'
   | 'automode:complete'
   | 'automode:error'
+  // Auto-research events
+  | 'autoresearch:start'
+  | 'autoresearch:pause'
+  | 'autoresearch:init'
+  | 'autoresearch:before'
+  | 'autoresearch:run'
+  | 'autoresearch:after'
+  | 'autoresearch:log'
+  | 'autoresearch:complete'
+  | 'autoresearch:error'
   // Learn events
   | 'pre-learn'
   | 'post-learn'
@@ -1890,6 +1975,15 @@ export const HOOK_EVENTS = [
   'automode:cancel',
   'automode:complete',
   'automode:error',
+  'autoresearch:start',
+  'autoresearch:pause',
+  'autoresearch:init',
+  'autoresearch:before',
+  'autoresearch:run',
+  'autoresearch:after',
+  'autoresearch:log',
+  'autoresearch:complete',
+  'autoresearch:error',
   'pre-learn',
   'post-learn',
   'goal-written:completed',
@@ -2053,6 +2147,16 @@ export interface HookContext {
   automodeCheckpointCommit?: string;
   /** Auto-mode total cost */
   automodeTotalCost?: number;
+  /** Auto-research goal or objective text */
+  autoresearchGoal?: string;
+  /** Whether auto-research is active after the event */
+  autoresearchActive?: boolean;
+  /** Auto-research completed iteration count */
+  autoresearchIteration?: number;
+  /** Auto-research maximum iteration count */
+  autoresearchMaxIterations?: number;
+  /** Auto-research command that triggered the event */
+  autoresearchSubcommand?: string;
   /** Review target path */
   reviewPath?: string;
   /** Review scope */

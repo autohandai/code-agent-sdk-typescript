@@ -105,12 +105,27 @@ await research.wait();
 if (await agent.supportsCommand('/autoresearch')) {
   await (await agent.autoresearch('Improve benchmark accuracy')).wait();
 }
+
+const started = await agent.startAutoresearch({
+  objective: 'Reduce test runtime',
+  metricName: 'total_ms',
+  metricUnit: 'ms',
+  direction: 'lower',
+  measureCommand: 'bun test',
+  checksCommand: 'bun run lint',
+  maxIterations: 12,
+  filesInScope: ['src', 'tests'],
+});
+
+const status = await agent.getAutoresearchStatus();
+await agent.stopAutoresearch();
 ```
 
 `agent.command('/name', args)` supports any slash command reported by the
-connected CLI. `/deep-research` is available in the current CLI. The
-`autoresearch` helper is forward-compatible with CLI builds that register
-`/autoresearch`; use `supportsCommand()` when supporting multiple CLI versions.
+connected CLI. `/deep-research` and `/autoresearch` are available in the current
+CLI. Use `supportsCommand()` when supporting older CLI versions. The typed
+autoresearch lifecycle methods use JSON-RPC and expose persisted state, run
+counts, benchmark configuration, and start/status/pause events.
 
 ### Low-Level API
 

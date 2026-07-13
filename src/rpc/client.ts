@@ -55,6 +55,11 @@ import type {
   GoalSnapshotResult,
   GoalMutationRpcResult,
   GoalTemplatesResult,
+  AutoresearchStartParams,
+  AutoresearchStartResult,
+  AutoresearchStatusResult,
+  AutoresearchStopResult,
+  AutoresearchEvent,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 
@@ -407,6 +412,18 @@ export class RPCClient {
     return this.transport.request('autohand.goal.listTemplates', {}) as Promise<GoalTemplatesResult>;
   }
 
+  async startAutoresearch(params: AutoresearchStartParams): Promise<AutoresearchStartResult> {
+    return this.transport.request('autohand.autoresearch.start', params) as Promise<AutoresearchStartResult>;
+  }
+
+  async getAutoresearchStatus(): Promise<AutoresearchStatusResult> {
+    return this.transport.request('autohand.autoresearch.status', {}) as Promise<AutoresearchStatusResult>;
+  }
+
+  async stopAutoresearch(): Promise<AutoresearchStopResult> {
+    return this.transport.request('autohand.autoresearch.stop', {}) as Promise<AutoresearchStopResult>;
+  }
+
   /**
    * Get context usage
    * 
@@ -650,6 +667,33 @@ export class RPCClient {
       const event: { type: 'permission_request'; requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; timestamp: string; options?: string[] } = { type: 'permission_request', requestId: p.requestId, tool: p.tool, description: p.description, context: p.context, timestamp: p.timestamp };
       if (p.options !== undefined) event.options = p.options;
       this.queueEvent(event);
+    });
+
+    const queueAutoresearchEvent = (phase: AutoresearchEvent['phase'], params: unknown): void => {
+      const p = params as Omit<AutoresearchEvent, 'type' | 'phase'>;
+      this.queueEvent({
+        type: 'autoresearch',
+        phase,
+        active: p.active,
+        runsLogged: p.runsLogged,
+        statusText: p.statusText,
+        subcommand: p.subcommand,
+        timestamp: p.timestamp,
+        ...(p.goal !== undefined ? { goal: p.goal } : {}),
+        ...(p.iteration !== undefined ? { iteration: p.iteration } : {}),
+        ...(p.maxIterations !== undefined ? { maxIterations: p.maxIterations } : {}),
+        ...(p.message !== undefined ? { message: p.message } : {}),
+      });
+    };
+
+    this.transport.onNotification('autohand.autoresearch.start', (params) => {
+      queueAutoresearchEvent('start', params);
+    });
+    this.transport.onNotification('autohand.autoresearch.status', (params) => {
+      queueAutoresearchEvent('status', params);
+    });
+    this.transport.onNotification('autohand.autoresearch.pause', (params) => {
+      queueAutoresearchEvent('pause', params);
     });
 
     // Errors

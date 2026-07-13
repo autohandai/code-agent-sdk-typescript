@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added typed autoresearch start, status, and stop RPC methods.
+- Added autoresearch lifecycle events, hook types, benchmark options, and persisted state types.
+- Registered `/autoresearch` as a current CLI capability alongside the streamed slash-command helper.
+
 ## v1.0.1-alpha.2.2ff35ae - 2026-06-26
 
 > Bleeding edge alpha build from main.

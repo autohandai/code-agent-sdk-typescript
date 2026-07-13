@@ -64,6 +64,50 @@ describe('CLI feature parity', () => {
     ]);
   });
 
+  it('routes autoresearch lifecycle operations through typed RPC methods', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return { success: true };
+    };
+
+    await client.startAutoresearch({
+      objective: 'Reduce test runtime',
+      metricName: 'total_ms',
+      metricUnit: 'ms',
+      direction: 'lower',
+      measureCommand: 'bun test',
+      checksCommand: 'bun run lint',
+      maxIterations: 12,
+      timeoutMs: 60_000,
+      filesInScope: ['src', 'tests'],
+      subagents: { ideaGeneration: true },
+    });
+    await client.getAutoresearchStatus();
+    await client.stopAutoresearch();
+
+    expect(calls).toEqual([
+      {
+        method: 'autohand.autoresearch.start',
+        params: {
+          objective: 'Reduce test runtime',
+          metricName: 'total_ms',
+          metricUnit: 'ms',
+          direction: 'lower',
+          measureCommand: 'bun test',
+          checksCommand: 'bun run lint',
+          maxIterations: 12,
+          timeoutMs: 60_000,
+          filesInScope: ['src', 'tests'],
+          subagents: { ideaGeneration: true },
+        },
+      },
+      { method: 'autohand.autoresearch.status', params: {} },
+      { method: 'autohand.autoresearch.stop', params: {} },
+    ]);
+  });
+
   it('uses live RPC command discovery instead of a stale SDK command list', async () => {
     const sdk = new AutohandSDK();
     (sdk as unknown as { started: boolean }).started = true;

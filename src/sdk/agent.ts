@@ -13,6 +13,10 @@ import type {
   SlashCommand,
   SlashCommandArguments,
   UpdateGoalParams,
+  AutoresearchStartParams,
+  AutoresearchStartResult,
+  AutoresearchStatusResult,
+  AutoresearchStopResult,
 } from '../types/index.js';
 
 export type AgentInput = string | PromptParams;
@@ -458,6 +462,18 @@ export class Agent {
 
   async autoresearch(objective: string, options?: AgentSendOptions): Promise<Run> {
     return this.command('/autoresearch', objective, options);
+  }
+
+  async startAutoresearch(params: AutoresearchStartParams): Promise<AutoresearchStartResult> {
+    return this.sdk.startAutoresearch(params);
+  }
+
+  async getAutoresearchStatus(): Promise<AutoresearchStatusResult> {
+    return this.sdk.getAutoresearchStatus();
+  }
+
+  async stopAutoresearch(): Promise<AutoresearchStopResult> {
+    return this.sdk.stopAutoresearch();
   }
 
   /**

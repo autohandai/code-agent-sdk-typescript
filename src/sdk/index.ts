@@ -61,6 +61,10 @@ import type {
   GoalSnapshotResult,
   GoalMutationRpcResult,
   GoalTemplatesResult,
+  AutoresearchStartParams,
+  AutoresearchStartResult,
+  AutoresearchStatusResult,
+  AutoresearchStopResult,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
 
@@ -844,6 +848,24 @@ export class AutohandSDK {
 
   async supportsCommand(command: SlashCommand): Promise<boolean> {
     return (await this.supportedCommands()).includes(command);
+  }
+
+  /** Start or resume a persisted auto-research experiment loop. */
+  async startAutoresearch(params: AutoresearchStartParams): Promise<AutoresearchStartResult> {
+    await this.ensureStarted();
+    return this.client.startAutoresearch(params);
+  }
+
+  /** Read the current persisted auto-research state and run count. */
+  async getAutoresearchStatus(): Promise<AutoresearchStatusResult> {
+    await this.ensureStarted();
+    return this.client.getAutoresearchStatus();
+  }
+
+  /** Pause the current auto-research loop without deleting `.auto/` state. */
+  async stopAutoresearch(): Promise<AutoresearchStopResult> {
+    await this.ensureStarted();
+    return this.client.stopAutoresearch();
   }
 
   async getGoal(): Promise<GoalSnapshotResult> {
