@@ -1,10 +1,18 @@
-import { AutohandSDK } from './index.js';
+import { AutohandSDK, formatSlashCommand } from './index.js';
 import type {
+  CreateGoalParams,
+  GoalMutationRpcResult,
+  GoalSnapshotResult,
+  GoalTemplatesResult,
   PermissionDecisionScope,
   PermissionResponseParams,
   PromptParams,
+  QueueGoalParams,
   SDKConfig,
   SDKEvent,
+  SlashCommand,
+  SlashCommandArguments,
+  UpdateGoalParams,
 } from '../types/index.js';
 
 export type AgentInput = string | PromptParams;
@@ -436,6 +444,22 @@ export class Agent {
     return run.wait();
   }
 
+  async command(
+    command: SlashCommand,
+    args?: SlashCommandArguments,
+    options?: AgentSendOptions
+  ): Promise<Run> {
+    return this.send(formatSlashCommand(command, args), options);
+  }
+
+  async deepResearch(topic: string, options?: AgentSendOptions): Promise<Run> {
+    return this.command('/deep-research', topic, options);
+  }
+
+  async autoresearch(objective: string, options?: AgentSendOptions): Promise<Run> {
+    return this.command('/autoresearch', objective, options);
+  }
+
   /**
    * Run a prompt to completion and parse the response as JSON.
    *
@@ -470,6 +494,42 @@ export class Agent {
 
   async disablePlanMode(): Promise<void> {
     await this.sdk.disablePlanMode();
+  }
+
+  async supportedCommands(): Promise<string[]> {
+    return this.sdk.supportedCommands();
+  }
+
+  async supportsCommand(command: SlashCommand): Promise<boolean> {
+    return this.sdk.supportsCommand(command);
+  }
+
+  async getGoal(): Promise<GoalSnapshotResult> {
+    return this.sdk.getGoal();
+  }
+
+  async createGoal(params: CreateGoalParams): Promise<GoalMutationRpcResult> {
+    return this.sdk.createGoal(params);
+  }
+
+  async updateGoal(params: UpdateGoalParams): Promise<GoalMutationRpcResult> {
+    return this.sdk.updateGoal(params);
+  }
+
+  async clearGoal(): Promise<GoalMutationRpcResult> {
+    return this.sdk.clearGoal();
+  }
+
+  async queueGoal(params: QueueGoalParams): Promise<GoalMutationRpcResult> {
+    return this.sdk.queueGoal(params);
+  }
+
+  async startQueuedGoal(): Promise<GoalMutationRpcResult> {
+    return this.sdk.startQueuedGoal();
+  }
+
+  async listGoalTemplates(): Promise<GoalTemplatesResult> {
+    return this.sdk.listGoalTemplates();
   }
 
   async allowPermission(requestId: string, scope?: PermissionDecisionScope): Promise<void> {

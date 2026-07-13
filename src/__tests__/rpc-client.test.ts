@@ -56,6 +56,10 @@ describe('RPC Client Notification Handling', () => {
       params: {
         turnId: 'turn_test_123',
         timestamp: '2026-05-04T00:00:00.000Z',
+        tokensUsed: 42,
+        tokensUsageStatus: 'actual',
+        durationMs: 1250,
+        contextPercent: 12,
       },
     }));
 
@@ -71,6 +75,10 @@ describe('RPC Client Notification Handling', () => {
       type: 'turn_end',
       turnId: 'turn_test_123',
       timestamp: '2026-05-04T00:00:00.000Z',
+      tokensUsed: 42,
+      tokensUsageStatus: 'actual',
+      durationMs: 1250,
+      contextPercent: 12,
     });
   });
 

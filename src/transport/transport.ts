@@ -59,10 +59,28 @@ export interface TransportOptions {
   maxRuntime?: number;
   /** Max API cost in dollars */
   maxCost?: number;
+  /** Minimal explicit runtime */
+  bare?: boolean;
+  /** Keep authenticated idle logout enabled */
+  idleLogout?: boolean;
+  /** Fork an existing session before startup */
+  fork?: string;
+  /** CLI display language locale */
+  displayLanguage?: string;
   /** System prompt (inline string or file path) */
   sysPrompt?: string;
+  /** File path that replaces the system prompt */
+  systemPromptFile?: string;
   /** Append to system prompt (inline string or file path) */
   appendSysPrompt?: string;
+  /** File path appended to the system prompt */
+  appendSystemPromptFile?: string;
+  /** Explicit MCP config file */
+  mcpConfig?: string;
+  /** Inline agents JSON or external agents directory */
+  agents?: string;
+  /** Explicit plugin/meta-tool directory */
+  pluginDir?: string;
   /** Model to use */
   model?: string;
   /** Sampling temperature */
@@ -141,6 +159,56 @@ export interface TransportOptions {
   hooksDefinitions?: import('../types/index.js').HookDefinition[];
 }
 
+export function buildCliArgs(options: TransportOptions): string[] {
+  const args = ['--mode', 'rpc'];
+
+  if (options.bare === true) args.push('--bare');
+  if (options.unrestricted === true) args.push('--unrestricted');
+  if (options.autoMode === true) args.push('--auto-mode');
+  if (options.autoSkill === true) args.push('--auto-skill');
+  if (options.autoCommit === true) args.push('-c');
+  if (options.idleLogout === false) args.push('--no-idle-logout');
+  if (options.contextCompact === false) args.push('--no-context-compact');
+  if (options.contextCompact === true) args.push('--context-compact');
+  if (options.persistSession === true) args.push('--persist-session');
+  if (options.sessionId !== undefined) args.push('--session-id', options.sessionId);
+  if (options.resume === true) args.push('--resume');
+  if (options.continue === true) args.push('--continue');
+  if (options.fork !== undefined) args.push('--fork', options.fork);
+  if (options.sessionPath !== undefined) args.push('--session-path', options.sessionPath);
+  if (options.autoSaveInterval !== undefined) args.push('--auto-save-interval', String(options.autoSaveInterval));
+  if (options.agentsMdEnable === false) args.push('--no-agents-md');
+  if (options.agentsMdEnable === true) args.push('--agents-md');
+  if (options.agentsMdCreate === true) args.push('--agents-md-create');
+  if (options.agentsMdPath !== undefined) args.push('--agents-md-path', options.agentsMdPath);
+  if (options.agentsMdAutoUpdate === true) args.push('--agents-md-auto-update');
+  if (options.maxTokens !== undefined) args.push('--max-tokens', String(options.maxTokens));
+  if (options.compressionThreshold !== undefined) args.push('--compression-threshold', String(options.compressionThreshold));
+  if (options.summarizationThreshold !== undefined) args.push('--summarization-threshold', String(options.summarizationThreshold));
+  if (options.skills !== undefined && options.skills.length > 0) args.push('--skills', options.skills.join(','));
+  if (options.skillSources !== undefined && options.skillSources.length > 0) args.push('--skill-sources', options.skillSources.join(','));
+  if (options.installMissingSkills === true) args.push('--install-missing-skills');
+  if (options.maxIterations !== undefined) args.push('--max-iterations', String(options.maxIterations));
+  if (options.maxRuntime !== undefined) args.push('--max-runtime', String(options.maxRuntime));
+  if (options.maxCost !== undefined) args.push('--max-cost', String(options.maxCost));
+  if (options.displayLanguage !== undefined) args.push('--display-language', options.displayLanguage);
+  if (options.sysPrompt !== undefined) args.push('--sys-prompt', options.sysPrompt);
+  if (options.systemPromptFile !== undefined) args.push('--system-prompt-file', options.systemPromptFile);
+  if (options.appendSysPrompt !== undefined) args.push('--append-sys-prompt', options.appendSysPrompt);
+  if (options.appendSystemPromptFile !== undefined) args.push('--append-system-prompt-file', options.appendSystemPromptFile);
+  if (options.mcpConfig !== undefined) args.push('--mcp-config', options.mcpConfig);
+  if (options.agents !== undefined) args.push('--agents', options.agents);
+  if (options.pluginDir !== undefined) args.push('--plugin-dir', options.pluginDir);
+  if (options.model !== undefined) args.push('--model', options.model);
+  if (options.temperature !== undefined) args.push('--temperature', String(options.temperature));
+  if (options.yolo !== undefined) args.push('--yolo', options.yolo);
+  if (options.yoloTimeout !== undefined) args.push('--yolo-timeout', String(options.yoloTimeout));
+  options.addDir?.forEach((dir) => args.push('--add-dir', dir));
+  if (options.extraArgs !== undefined) args.push(...options.extraArgs);
+
+  return args;
+}
+
 export class Transport {
   private process: ChildProcess | null = null;
   private lineReader: LineReader | null = null;
@@ -179,110 +247,7 @@ export class Transport {
     this.log(`Working directory: ${cwd}`);
 
     // Build CLI arguments
-    const args = ['--mode', 'rpc'];
-
-    if (this.options.unrestricted === true) {
-      args.push('--unrestricted');
-    }
-    if (this.options.autoMode === true) {
-      args.push('--auto-mode');
-    }
-    if (this.options.autoSkill === true) {
-      args.push('--auto-skill');
-    }
-    if (this.options.autoCommit === true) {
-      args.push('-c');
-    }
-    if (this.options.contextCompact === false) {
-      args.push('--no-context-compact');
-    } else if (this.options.contextCompact === true) {
-      args.push('--context-compact');
-    }
-    if (this.options.persistSession === true) {
-      args.push('--persist-session');
-    }
-    if (this.options.sessionId !== undefined) {
-      args.push('--session-id', this.options.sessionId);
-    }
-    if (this.options.resume === true) {
-      args.push('--resume');
-    }
-    if (this.options.continue === true) {
-      args.push('--continue');
-    }
-    if (this.options.sessionPath !== undefined) {
-      args.push('--session-path', this.options.sessionPath);
-    }
-    if (this.options.autoSaveInterval !== undefined) {
-      args.push('--auto-save-interval', String(this.options.autoSaveInterval));
-    }
-    if (this.options.agentsMdEnable === false) {
-      args.push('--no-agents-md');
-    } else if (this.options.agentsMdEnable === true) {
-      args.push('--agents-md');
-    }
-    if (this.options.agentsMdCreate === true) {
-      args.push('--agents-md-create');
-    }
-    if (this.options.agentsMdPath !== undefined) {
-      args.push('--agents-md-path', this.options.agentsMdPath);
-    }
-    if (this.options.agentsMdAutoUpdate === true) {
-      args.push('--agents-md-auto-update');
-    }
-    if (this.options.maxTokens !== undefined) {
-      args.push('--max-tokens', String(this.options.maxTokens));
-    }
-    if (this.options.compressionThreshold !== undefined) {
-      args.push('--compression-threshold', String(this.options.compressionThreshold));
-    }
-    if (this.options.summarizationThreshold !== undefined) {
-      args.push('--summarization-threshold', String(this.options.summarizationThreshold));
-    }
-    if (this.options.skills !== undefined && this.options.skills.length > 0) {
-      args.push('--skills', this.options.skills.join(','));
-    }
-    if (this.options.skillSources !== undefined && this.options.skillSources.length > 0) {
-      args.push('--skill-sources', this.options.skillSources.join(','));
-    }
-    if (this.options.installMissingSkills === true) {
-      args.push('--install-missing-skills');
-    }
-    if (this.options.maxIterations !== undefined) {
-      args.push('--max-iterations', String(this.options.maxIterations));
-    }
-    if (this.options.maxRuntime !== undefined) {
-      args.push('--max-runtime', String(this.options.maxRuntime));
-    }
-    if (this.options.maxCost !== undefined) {
-      args.push('--max-cost', String(this.options.maxCost));
-    }
-    if (this.options.sysPrompt !== undefined) {
-      args.push('--sys-prompt', this.options.sysPrompt);
-    }
-    if (this.options.appendSysPrompt !== undefined) {
-      args.push('--append-sys-prompt', this.options.appendSysPrompt);
-    }
-    if (this.options.model !== undefined) {
-      args.push('--model', this.options.model);
-    }
-    if (this.options.temperature !== undefined) {
-      args.push('--temperature', String(this.options.temperature));
-    }
-    if (this.options.yolo !== undefined) {
-      args.push('--yolo', this.options.yolo);
-    }
-    if (this.options.yoloTimeout !== undefined) {
-      args.push('--yolo-timeout', String(this.options.yoloTimeout));
-    }
-    if (this.options.addDir !== undefined && this.options.addDir.length > 0) {
-      this.options.addDir.forEach((dir) => {
-        args.push('--add-dir', dir);
-      });
-    }
-    if (this.options.extraArgs !== undefined) {
-      args.push(...this.options.extraArgs);
-    }
+    const args = buildCliArgs(this.options);
 
     this.log(`CLI args: ${args.join(' ')}`);
 

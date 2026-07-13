@@ -41,7 +41,7 @@ export type {
 /**
  * Main SDK class for interacting with the Autohand CLI
  */
-export { AutohandSDK } from './sdk/index.js';
+export { AutohandSDK, formatSlashCommand } from './sdk/index.js';
 
 /**
  * JSON-RPC client for communicating with the CLI subprocess

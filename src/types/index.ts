@@ -37,7 +37,26 @@ export type JsonRpcParams = Record<string, unknown> | unknown[];
 /**
  * Available providers in CLI-3
  */
-export type ProviderName = 'autohandai' | 'openrouter' | 'ollama' | 'llamacpp' | 'openai' | 'mlx' | 'llmgateway' | 'azure' | 'zai' | 'xai' | 'cerebras' | 'deepseek' | 'vertexai' | 'nvidia';
+export type BuiltInProviderName =
+  | 'autohandai'
+  | 'openrouter'
+  | 'ollama'
+  | 'llamacpp'
+  | 'openai'
+  | 'mlx'
+  | 'llmgateway'
+  | 'azure'
+  | 'zai'
+  | 'sakana'
+  | 'xai'
+  | 'cerebras'
+  | 'deepseek'
+  | 'vertexai'
+  | 'nvidia'
+  | 'bedrock';
+
+export type CustomProviderId = `custom:${string}`;
+export type ProviderName = BuiltInProviderName | CustomProviderId;
 
 /**
  * AUTOHAND_ prefixed environment variables supported by CLI-3.
@@ -58,6 +77,8 @@ export interface AutohandEnvVars {
   AUTOHAND_AI_PLAN?: string;
   /** Enable debug logging mode ('1' to enable) */
   AUTOHAND_DEBUG?: string;
+  /** Enable the minimal explicit runtime used by --bare */
+  AUTOHAND_CODE_SIMPLE?: string;
   /** Client identifier for ACP extensions (e.g., 'zed', 'terminal') */
   AUTOHAND_CLIENT_NAME?: string;
   /** Client version string */
@@ -68,6 +89,8 @@ export interface AutohandEnvVars {
   AUTOHAND_LOCALE?: string;
   /** Suppress startup banner ('1' to suppress) */
   AUTOHAND_NO_BANNER?: string;
+  /** Disable authenticated idle logout for long-running sessions */
+  AUTOHAND_NO_IDLE_LOGOUT?: string;
   /** Force non-interactive mode ('1' to enable) */
   AUTOHAND_NON_INTERACTIVE?: string;
   /** Permission callback timeout in milliseconds */
@@ -118,6 +141,7 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
       validateAzureConfig(config);
       break;
     case 'zai':
+    case 'sakana':
     case 'openrouter':
     case 'llmgateway':
     case 'xai':
@@ -126,6 +150,8 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'vertexai':
     case 'nvidia':
       validateCloudProviderConfig(provider, config);
+      break;
+    case 'bedrock':
       break;
     case 'autohandai':
       if (config.autohandAIPlan !== 'local') {
@@ -137,6 +163,10 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'mlx':
       validateLocalProviderConfig(provider, config);
       break;
+    default:
+      if (provider.startsWith('custom:')) {
+        return;
+      }
   }
 }
 
@@ -1106,6 +1136,10 @@ export interface SDKConfig {
   maxRuntime?: number;
   /** Max API cost in dollars */
   maxCost?: number;
+  /** Minimal explicit runtime with implicit integrations disabled */
+  bare?: boolean;
+  /** Keep authenticated idle logout enabled. Set false for long-running agents. */
+  idleLogout?: boolean;
 
   // ============================================================================
   // Skills Configuration
@@ -1132,10 +1166,14 @@ export interface SDKConfig {
   sysPrompt?: string;
   /** Alias for sysPrompt */
   systemPrompt?: string;
+  /** File path that replaces the entire system prompt */
+  systemPromptFile?: string;
   /** Append to system prompt (inline string or file path) */
   appendSysPrompt?: string;
   /** Alias for appendSysPrompt */
   appendSystemPrompt?: string;
+  /** File path appended to the system prompt */
+  appendSystemPromptFile?: string;
 
   // ============================================================================
   // Session Configuration
@@ -1150,6 +1188,8 @@ export interface SDKConfig {
   resume?: boolean;
   /** Continue from last session (legacy, use session.continue) */
   continue?: boolean;
+  /** Fork an existing session before the RPC runtime starts */
+  fork?: string;
 
   // ============================================================================
   // Workspace Configuration
@@ -1217,6 +1257,8 @@ export interface SDKConfig {
   // ============================================================================
   /** MCP server configurations */
   mcpServers?: Record<string, McpServerConfig>;
+  /** Explicit MCP config file passed to the CLI */
+  mcpConfig?: string;
 
   // ============================================================================
   // Hooks Configuration
@@ -1231,6 +1273,18 @@ export interface SDKConfig {
   // ============================================================================
   /** Plugins to load */
   plugins?: string[];
+  /** Explicit plugin/meta-tool directory passed to the CLI */
+  pluginDir?: string;
+
+  // ============================================================================
+  // Agent and Feature Configuration
+  // ============================================================================
+  /** Inline agents JSON or an external agents directory */
+  agents?: string;
+  /** CLI display language locale */
+  displayLanguage?: string;
+  /** Current CLI feature and experiment settings */
+  features?: FeatureFlagSettings;
 
   // ============================================================================
   // Output Configuration
@@ -1261,6 +1315,18 @@ export interface SDKConfig {
   betas?: string[];
   /** Task budget */
   taskBudget?: number;
+}
+
+export interface FeatureFlagSettings {
+  environment?: string;
+  remoteOverrides?: Record<string, 'off'>;
+  usageV2?: boolean;
+  awsBedrockProvider?: boolean;
+  slashGoal?: boolean;
+  tokenUsageStatus?: boolean;
+  experimentalFork?: boolean;
+  experimentalClone?: boolean;
+  experimentalHandoff?: boolean;
 }
 
 export interface CLIConfig {
@@ -1301,6 +1367,116 @@ export interface CLIConfig {
 // ============================================================================
 // RPC Method Parameters
 // ============================================================================
+
+export type SlashCommand = `/${string}`;
+export type SlashCommandArguments = string | readonly string[];
+
+export type GoalStatus = 'active' | 'paused' | 'budgetLimited' | 'complete';
+
+export interface GoalState {
+  goalId: string;
+  objective: string;
+  status: GoalStatus;
+  tokenBudget?: number;
+  timeBudgetSeconds?: number;
+  minTokensBeforeWrapUp?: number;
+  minTimeSecondsBeforeWrapUp?: number;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface QueuedGoal {
+  queueId: string;
+  objective: string;
+  tokenBudget?: number;
+  timeBudgetSeconds?: number;
+  minTokensBeforeWrapUp?: number;
+  minTimeSecondsBeforeWrapUp?: number;
+  source: 'command' | 'tool' | 'rpc' | 'cli';
+  template?: string;
+  templateFlags?: Record<string, string>;
+  templateArgs?: string;
+  createdAt: number;
+}
+
+export interface CompletedGoal {
+  goalId: string;
+  objective: string;
+  status: Extract<GoalStatus, 'complete' | 'budgetLimited'>;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  completedAt: number;
+}
+
+export interface GoalSnapshot {
+  version: 1;
+  goal: GoalState | null;
+  queue: QueuedGoal[];
+  completed: CompletedGoal[];
+  updatedAt: number;
+}
+
+export interface GoalTemplateMetadata {
+  name: string;
+  path: string;
+  description?: string;
+  aliases: string[];
+  allowCommands: boolean;
+  requiredPlaceholders: string[];
+  requiredFlags: string[];
+  requiresArgs: boolean;
+}
+
+export interface GoalMutationResult {
+  ok: boolean;
+  goal: GoalState | null;
+  queue: QueuedGoal[];
+  telemetry?: {
+    timeRemainingSeconds?: number;
+    tokensRemaining?: number;
+    completionFloorMet?: boolean;
+  };
+  message?: string;
+  queued?: QueuedGoal[];
+  started?: QueuedGoal;
+  completed?: CompletedGoal;
+  completedRun?: CompletedGoal[];
+  dequeued?: QueuedGoal;
+  removed?: QueuedGoal;
+}
+
+export interface GoalFeatureDisabledResult {
+  ok: false;
+  message: string;
+}
+
+export interface GoalBudgetParams {
+  tokenBudget?: number;
+  timeBudgetSeconds?: number;
+  minTokensBeforeWrapUp?: number;
+  minTimeSecondsBeforeWrapUp?: number;
+}
+
+export interface CreateGoalParams extends GoalBudgetParams {
+  objective: string;
+}
+
+export interface UpdateGoalParams {
+  objective?: string;
+  status?: GoalStatus;
+  tokenBudget?: number | null;
+  timeBudgetSeconds?: number | null;
+  minTokensBeforeWrapUp?: number | null;
+  minTimeSecondsBeforeWrapUp?: number | null;
+}
+
+export type QueueGoalParams = CreateGoalParams;
+export type GoalSnapshotResult = GoalSnapshot | GoalFeatureDisabledResult;
+export type GoalMutationRpcResult = GoalMutationResult | GoalFeatureDisabledResult;
+export type GoalTemplatesResult = GoalTemplateMetadata[] | GoalFeatureDisabledResult;
 
 export interface PromptParams {
   message: string;
@@ -1428,6 +1604,7 @@ export interface TurnEndParams {
   turnId: string;
   timestamp: string;
   tokensUsed?: number;
+  tokensUsageStatus?: 'actual' | 'unavailable';
   durationMs?: number;
   contextPercent?: number;
 }
@@ -1539,6 +1716,7 @@ export interface TurnEndEvent {
   turnId: string;
   timestamp: string;
   tokensUsed?: number;
+  tokensUsageStatus?: 'actual' | 'unavailable';
   durationMs?: number;
   contextPercent?: number;
 }
@@ -1666,6 +1844,8 @@ export type HookEvent =
   // Learn events
   | 'pre-learn'
   | 'post-learn'
+  // Goal authoring events
+  | 'goal-written:completed'
   // Team events
   | 'team-created'
   | 'teammate-spawned'
@@ -1712,6 +1892,7 @@ export const HOOK_EVENTS = [
   'automode:error',
   'pre-learn',
   'post-learn',
+  'goal-written:completed',
   'team-created',
   'teammate-spawned',
   'teammate-idle',
@@ -1814,6 +1995,12 @@ export interface HookContext {
   tokensUsed?: number;
   /** Whether tokensUsed is actual provider-reported usage or unavailable */
   tokensUsageStatus?: 'actual' | 'unavailable';
+  /** Goal identifier for goal authoring hooks */
+  goalId?: string;
+  /** Goal objective for goal authoring hooks */
+  goalObjective?: string;
+  /** Surface that created the goal */
+  goalSource?: string;
   /** Tool calls count (for stop) */
   toolCallsCount?: number;
   /** Tool calls in this turn (for stop) */

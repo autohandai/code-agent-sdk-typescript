@@ -93,6 +93,25 @@ const risk = await agent.runJson<ReleaseRisk>('Assess publish readiness', {
 });
 ```
 
+Run CLI feature commands through the same streamed run lifecycle:
+
+```typescript
+const research = await agent.deepResearch('Hermes self-evolving systems');
+for await (const event of research.stream()) {
+  console.log(event.type);
+}
+await research.wait();
+
+if (await agent.supportsCommand('/autoresearch')) {
+  await (await agent.autoresearch('Improve benchmark accuracy')).wait();
+}
+```
+
+`agent.command('/name', args)` supports any slash command reported by the
+connected CLI. `/deep-research` is available in the current CLI. The
+`autoresearch` helper is forward-compatible with CLI builds that register
+`/autoresearch`; use `supportsCommand()` when supporting multiple CLI versions.
+
 ### Low-Level API
 
 ```typescript
@@ -130,6 +149,11 @@ const sdk = new AutohandSDK({
   cliPath: '/path/to/cli',     // Optional: custom CLI path
   debug: true,                 // Enable debug logging
   timeout: 30000,              // Request timeout in ms
+  bare: false,                 // Optional minimal explicit runtime
+  idleLogout: false,           // Keep long-running SDK sessions alive
+  features: {
+    slashGoal: true,           // Enable typed persistent-goal RPC methods
+  },
 });
 ```
 
@@ -183,6 +207,16 @@ Run a prompt to completion.
 ```typescript
 const result = await agent.run('Summarize release risk');
 console.log(result.text);
+```
+
+#### `agent.command(command, args?, options?): Promise<Run>`
+
+Execute a CLI slash command with normal SDK event streaming. Convenience
+helpers are available for `deepResearch(topic)` and `autoresearch(objective)`.
+
+```typescript
+const run = await agent.command('/deep-research', 'TypeScript RPC reliability');
+const result = await run.wait();
 ```
 
 #### `agent.runJson<T>(input, options?): Promise<T>`
@@ -240,6 +274,36 @@ Send a prompt and stream events.
 for await (const event of sdk.streamPrompt({ message: 'Hello' })) {
   console.log(event);
 }
+```
+
+#### `streamCommand(command, args?): AsyncGenerator<SDKEvent>`
+
+Execute a registered CLI slash command and stream its events. Use
+`supportedCommands()` or `supportsCommand('/command')` for capability checks.
+
+#### Persistent goal methods
+
+The SDK exposes the CLI's typed goal RPC surface:
+
+- `getGoal()`
+- `createGoal(params)`
+- `updateGoal(params)`
+- `clearGoal()`
+- `queueGoal(params)`
+- `startQueuedGoal()`
+- `listGoalTemplates()`
+
+Enable the CLI experiment when creating the SDK:
+
+```typescript
+const agent = await Agent.create({
+  features: { slashGoal: true },
+});
+
+await agent.createGoal({
+  objective: 'Finish the SDK parity upgrade with passing validation',
+  tokenBudget: 20_000,
+});
 ```
 
 #### `abort(): Promise<void>`
@@ -342,6 +406,9 @@ The SDK emits the following events:
 - `tool_end` - Tool execution ended
 - `permission_request` - Permission request from agent
 - `error` - Error occurred
+
+`turn_end` includes provider-reported `tokensUsed`, `tokensUsageStatus`,
+`durationMs`, and `contextPercent` when the CLI supplies them.
 
 ## Examples
 

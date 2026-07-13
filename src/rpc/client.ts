@@ -21,7 +21,7 @@
  * @internal
  */
 
-import { Transport } from '../transport/transport.js';
+import { Transport, type TransportOptions } from '../transport/transport.js';
 import type {
   SDKConfig,
   PromptParams,
@@ -37,9 +37,7 @@ import type {
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
-  ProviderName,
   SkillReference,
-  HookDefinition,
   AddHookParams,
   AddHookResult,
   RemoveHookParams,
@@ -51,6 +49,12 @@ import type {
   GetHooksResult,
   PermissionMode,
   LegacyPermissionMode,
+  CreateGoalParams,
+  UpdateGoalParams,
+  QueueGoalParams,
+  GoalSnapshotResult,
+  GoalMutationRpcResult,
+  GoalTemplatesResult,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 
@@ -87,6 +91,23 @@ function normalizePermissionResponse(params: PermissionResponseParams): Permissi
   }
 
   return params;
+}
+
+function toGoalRpcParams(
+  params: CreateGoalParams | UpdateGoalParams
+): Record<string, string | number | null> {
+  const rpcParams: Record<string, string | number | null> = {};
+  if (params.objective !== undefined) rpcParams.objective = params.objective;
+  if ('status' in params && params.status !== undefined) rpcParams.status = params.status;
+  if (params.tokenBudget !== undefined) rpcParams.token_budget = params.tokenBudget;
+  if (params.timeBudgetSeconds !== undefined) rpcParams.time_budget_seconds = params.timeBudgetSeconds;
+  if (params.minTokensBeforeWrapUp !== undefined) {
+    rpcParams.min_tokens_before_wrap_up = params.minTokensBeforeWrapUp;
+  }
+  if (params.minTimeSecondsBeforeWrapUp !== undefined) {
+    rpcParams.min_time_seconds_before_wrap_up = params.minTimeSecondsBeforeWrapUp;
+  }
+  return rpcParams;
 }
 
 export class RPCClient {
@@ -145,53 +166,7 @@ export class RPCClient {
       processedSkills.push(name);
     }
 
-    const transportOptions: {
-      cwd?: string;
-      cliPath?: string;
-      debug?: boolean;
-      timeout?: number;
-      autoMode?: boolean;
-      unrestricted?: boolean;
-      autoSkill?: boolean;
-      autoCommit?: boolean;
-      contextCompact?: boolean;
-      maxIterations?: number;
-      maxRuntime?: number;
-      maxCost?: number;
-      sysPrompt?: string;
-      appendSysPrompt?: string;
-      model?: string;
-      temperature?: number;
-      yolo?: string;
-      yoloTimeout?: number;
-      addDir?: string[];
-      extraArgs?: string[];
-      persistSession?: boolean;
-      sessionId?: string;
-      resume?: boolean;
-      continue?: boolean;
-      sessionPath?: string;
-      autoSaveInterval?: number;
-      agentsMdEnable?: boolean;
-      agentsMdCreate?: boolean;
-      agentsMdPath?: string;
-      agentsMdAutoUpdate?: boolean;
-      maxTokens?: number;
-      compressionThreshold?: number;
-      summarizationThreshold?: number;
-      skills?: string[];
-      skillFiles?: string[];
-      skillSources?: string[];
-      installMissingSkills?: boolean;
-      provider?: ProviderName | undefined;
-      apiKey?: string;
-      baseUrl?: string;
-      autohandAIPlan?: 'cloud' | 'local';
-      port?: number;
-      envVars?: import('../types/index.js').AutohandEnvVars;
-      hooksEnabled?: boolean;
-      hooksDefinitions?: HookDefinition[];
-    } = {};
+    const transportOptions: TransportOptions = {};
 
     if (config.cwd !== undefined) transportOptions.cwd = config.cwd;
     if (config.cliPath !== undefined) transportOptions.cliPath = config.cliPath;
@@ -207,10 +182,19 @@ export class RPCClient {
     if (config.maxIterations !== undefined) transportOptions.maxIterations = config.maxIterations;
     if (config.maxRuntime !== undefined) transportOptions.maxRuntime = config.maxRuntime;
     if (config.maxCost !== undefined) transportOptions.maxCost = config.maxCost;
+    if (config.bare !== undefined) transportOptions.bare = config.bare;
+    if (config.idleLogout !== undefined) transportOptions.idleLogout = config.idleLogout;
+    if (config.fork !== undefined) transportOptions.fork = config.fork;
+    if (config.displayLanguage !== undefined) transportOptions.displayLanguage = config.displayLanguage;
     if (config.sysPrompt !== undefined) transportOptions.sysPrompt = config.sysPrompt;
     if (config.systemPrompt !== undefined) transportOptions.sysPrompt = config.systemPrompt;
+    if (config.systemPromptFile !== undefined) transportOptions.systemPromptFile = config.systemPromptFile;
     if (config.appendSysPrompt !== undefined) transportOptions.appendSysPrompt = config.appendSysPrompt;
     if (config.appendSystemPrompt !== undefined) transportOptions.appendSysPrompt = config.appendSystemPrompt;
+    if (config.appendSystemPromptFile !== undefined) transportOptions.appendSystemPromptFile = config.appendSystemPromptFile;
+    if (config.mcpConfig !== undefined) transportOptions.mcpConfig = config.mcpConfig;
+    if (config.agents !== undefined) transportOptions.agents = config.agents;
+    if (config.pluginDir !== undefined) transportOptions.pluginDir = config.pluginDir;
     if (config.model !== undefined) transportOptions.model = config.model;
     if (config.temperature !== undefined) transportOptions.temperature = config.temperature;
     if (config.yolo !== undefined) transportOptions.yolo = config.yolo;
@@ -395,6 +379,34 @@ export class RPCClient {
     return this.transport.request('autohand.getSupportedCommands', {});
   }
 
+  async getGoal(): Promise<GoalSnapshotResult> {
+    return this.transport.request('autohand.goal.get', {}) as Promise<GoalSnapshotResult>;
+  }
+
+  async createGoal(params: CreateGoalParams): Promise<GoalMutationRpcResult> {
+    return this.transport.request('autohand.goal.create', toGoalRpcParams(params)) as Promise<GoalMutationRpcResult>;
+  }
+
+  async updateGoal(params: UpdateGoalParams): Promise<GoalMutationRpcResult> {
+    return this.transport.request('autohand.goal.update', toGoalRpcParams(params)) as Promise<GoalMutationRpcResult>;
+  }
+
+  async clearGoal(): Promise<GoalMutationRpcResult> {
+    return this.transport.request('autohand.goal.clear', {}) as Promise<GoalMutationRpcResult>;
+  }
+
+  async queueGoal(params: QueueGoalParams): Promise<GoalMutationRpcResult> {
+    return this.transport.request('autohand.goal.queue', toGoalRpcParams(params)) as Promise<GoalMutationRpcResult>;
+  }
+
+  async startQueuedGoal(): Promise<GoalMutationRpcResult> {
+    return this.transport.request('autohand.goal.startQueued', {}) as Promise<GoalMutationRpcResult>;
+  }
+
+  async listGoalTemplates(): Promise<GoalTemplatesResult> {
+    return this.transport.request('autohand.goal.listTemplates', {}) as Promise<GoalTemplatesResult>;
+  }
+
   /**
    * Get context usage
    * 
@@ -566,10 +578,26 @@ export class RPCClient {
     });
 
     this.transport.onNotification('autohand.turnEnd', (params) => {
-      const p = params as { turnId: string; timestamp: string };
+      const p = params as {
+        turnId: string;
+        timestamp: string;
+        tokensUsed?: number;
+        tokensUsageStatus?: 'actual' | 'unavailable';
+        durationMs?: number;
+        contextPercent?: number;
+      };
       // Map turn_end to agent_end for streamPrompt to detect completion
       this.queueEvent({ type: 'agent_end', reason: 'completed', sessionId: p.turnId, timestamp: new Date().toISOString() });
-      this.queueEvent({ type: 'turn_end', turnId: p.turnId, timestamp: p.timestamp });
+      const event: SDKEvent = {
+        type: 'turn_end',
+        turnId: p.turnId,
+        timestamp: p.timestamp,
+        ...(p.tokensUsed !== undefined ? { tokensUsed: p.tokensUsed } : {}),
+        ...(p.tokensUsageStatus !== undefined ? { tokensUsageStatus: p.tokensUsageStatus } : {}),
+        ...(p.durationMs !== undefined ? { durationMs: p.durationMs } : {}),
+        ...(p.contextPercent !== undefined ? { contextPercent: p.contextPercent } : {}),
+      };
+      this.queueEvent(event);
     });
 
     // Message lifecycle

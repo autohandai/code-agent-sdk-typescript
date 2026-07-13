@@ -53,8 +53,31 @@ import type {
   ToggleHookResult,
   TestHookResult,
   GetHooksResult,
+  SlashCommand,
+  SlashCommandArguments,
+  CreateGoalParams,
+  UpdateGoalParams,
+  QueueGoalParams,
+  GoalSnapshotResult,
+  GoalMutationRpcResult,
+  GoalTemplatesResult,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
+
+export function formatSlashCommand(
+  command: SlashCommand,
+  args?: SlashCommandArguments
+): string {
+  const normalizedCommand = command.trim();
+  if (!normalizedCommand.startsWith('/') || /\s/.test(normalizedCommand)) {
+    throw new Error(`Invalid slash command: ${command}`);
+  }
+
+  const normalizedArgs = typeof args === 'string'
+    ? args.trim()
+    : args?.map((arg) => arg.trim()).filter((arg) => arg !== '').join(' ') ?? '';
+  return normalizedArgs === '' ? normalizedCommand : `${normalizedCommand} ${normalizedArgs}`;
+}
 
 /**
  * Process AGENTS.md configuration from prompt params
@@ -362,6 +385,10 @@ export class AutohandSDK {
     await this.client.start();
     this.started = true;
 
+    if (this.config.features !== undefined) {
+      await this.client.applyFlagSettings({ features: this.config.features });
+    }
+
     const startupPermissionMode = this.config.permissionMode;
     if (requiresStartupPermissionModeRpc(startupPermissionMode)) {
       await this.client.setPermissionMode(startupPermissionMode);
@@ -540,6 +567,13 @@ export class AutohandSDK {
         break;
       }
     }
+  }
+
+  async *streamCommand(
+    command: SlashCommand,
+    args?: SlashCommandArguments
+  ): AsyncGenerator<SDKEvent> {
+    yield* this.streamPrompt({ message: formatSlashCommand(command, args) });
   }
 
   /**
@@ -799,12 +833,52 @@ export class AutohandSDK {
    * ```
    */
   async supportedCommands(): Promise<string[]> {
-    // TODO: Implement RPC method to get supported commands
-    return [
-      'help', 'new', 'model', 'resume', 'sessions', 'session',
-      'status', 'undo', 'init', 'memory', 'skills', 'export',
-      'permissions', 'feedback', 'agents', 'hooks', 'automode',
-    ];
+    await this.ensureStarted();
+    const result = await this.client.getSupportedCommands();
+    const commands = (result as { commands?: unknown }).commands;
+    if (!Array.isArray(commands)) return [];
+    return commands
+      .filter((command): command is string => typeof command === 'string')
+      .map((command) => command.startsWith('/') ? command : `/${command}`);
+  }
+
+  async supportsCommand(command: SlashCommand): Promise<boolean> {
+    return (await this.supportedCommands()).includes(command);
+  }
+
+  async getGoal(): Promise<GoalSnapshotResult> {
+    await this.ensureStarted();
+    return this.client.getGoal();
+  }
+
+  async createGoal(params: CreateGoalParams): Promise<GoalMutationRpcResult> {
+    await this.ensureStarted();
+    return this.client.createGoal(params);
+  }
+
+  async updateGoal(params: UpdateGoalParams): Promise<GoalMutationRpcResult> {
+    await this.ensureStarted();
+    return this.client.updateGoal(params);
+  }
+
+  async clearGoal(): Promise<GoalMutationRpcResult> {
+    await this.ensureStarted();
+    return this.client.clearGoal();
+  }
+
+  async queueGoal(params: QueueGoalParams): Promise<GoalMutationRpcResult> {
+    await this.ensureStarted();
+    return this.client.queueGoal(params);
+  }
+
+  async startQueuedGoal(): Promise<GoalMutationRpcResult> {
+    await this.ensureStarted();
+    return this.client.startQueuedGoal();
+  }
+
+  async listGoalTemplates(): Promise<GoalTemplatesResult> {
+    await this.ensureStarted();
+    return this.client.listGoalTemplates();
   }
 
   /**
