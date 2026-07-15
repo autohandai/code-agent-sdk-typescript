@@ -1,6 +1,6 @@
 {
   "name": "@autohandai/agent-sdk",
-  "version": "1.0.1-alpha.9.c2177f5",
+  "version": "1.0.2",
   "license": "Apache-2.0",
   "description": "Autohand Code Agent SDK - CLI wrapper implementation",
   "repository": {
