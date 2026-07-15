@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.2-alpha.15.dbdc851 - 2026-07-15
+
+> Bleeding edge alpha build from main.
+
+### Changes
+
+- Keep published SDK examples buildable from clean checkouts (dbdc851)
+- Document replayable autoresearch SDK workflows (eb58e35)
+
 ## v1.0.2-alpha.13.eb58e35 - 2026-07-15
 
 > Bleeding edge alpha build from main.
