@@ -27,12 +27,14 @@ for (const file of exampleFiles) {
 
     const usesSDK = content.includes('new AutohandSDK') || content.includes('import { AutohandSDK }');
     const usesAgent = content.includes('Agent.create') || content.includes('import { Agent }');
+    const hasSdkImport = content.includes("from '../src/index.js'")
+      || content.includes("from '@autohandai/agent-sdk'");
     const startsSdk = /await\s+\w+\.start\(/.test(content);
     const stopsSdk = /await\s+\w+\.(?:stop|close)\(/.test(content);
 
     // Validate structure without requiring every example to use the same API layer.
     const checks = {
-      hasSdkImport: content.includes("from '../src/index.js'"),
+      hasSdkImport,
       hasMain: content.includes('async function main'),
       hasLifecycleStart: usesAgent
         ? content.includes('Agent.create')

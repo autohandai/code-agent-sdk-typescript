@@ -6,6 +6,7 @@ Complete API reference for @autohandai/agent-sdk TypeScript SDK.
 
 - [High-Level API](#high-level-api)
   - [Agent](#agent)
+  - [Autoresearch ledger](#autoresearch-ledger)
   - [Run](#run)
 - [Low-Level API](#low-level-api)
   - [AutohandSDK](#autohandsdk)
@@ -100,6 +101,110 @@ console.log(result.text);
 - `options` - Optional prompt parameters
 
 **Returns:** `Promise<RunResult>` - The completed run result
+
+---
+
+### Autoresearch ledger
+
+`Agent` and `AutohandSDK` expose the same typed replayable-autoresearch methods.
+Use `Agent` when the returned loop instruction should run through the normal
+`Run` lifecycle. New sessions require a clean Git repository and a benchmark
+that emits exactly one finite `METRIC <name>=<number>` value for every objective.
+
+See the [replayable autoresearch guide](./autoresearch.md) and
+[`examples/27-autoresearch-ledger.ts`](../examples/27-autoresearch-ledger.ts) for
+the complete evaluator, event, replay, and retention workflow.
+
+#### `agent.startAutoresearch(params: AutoresearchStartParams): Promise<AutoresearchStartResult>`
+
+Initialize or resume persisted autoresearch state. A newly configured session
+captures a sampled zero-diff baseline and creates `.auto/ledger/`. Send the
+successful result's `instruction` to `agent.send()` to execute the autonomous loop.
+
+```typescript
+const started = await agent.startAutoresearch({
+  objective: 'Reduce test runtime',
+  metricName: 'test_ms',
+  metricUnit: 'ms',
+  direction: 'lower',
+  measureScript,
+  checksCommand: 'bun run typecheck && bun run lint',
+  filesInScope: ['src', 'tests'],
+  sampling: { minSamples: 3, maxSamples: 9, confidenceThreshold: 2 },
+});
+
+if (!started.success || !started.instruction) {
+  throw new Error(started.error ?? 'Autoresearch could not start.');
+}
+
+await (await agent.send(started.instruction)).wait();
+```
+
+`AutoresearchStartParams` also accepts `secondaryObjectives`, `constraints`,
+`retention`, `environmentAllowlist`, `subagents`, `timeoutMs`, and `maxIterations`.
+
+---
+
+#### `agent.getAutoresearchStatus(): Promise<AutoresearchStatusResult>`
+
+Return active state, progress text, run count, current attempts, and Pareto IDs.
+
+---
+
+#### `agent.stopAutoresearch(): Promise<AutoresearchStopResult>`
+
+Pause the current loop without deleting `.auto/` state or ledger records.
+
+---
+
+#### `agent.getAutoresearchHistory(): Promise<AutoresearchHistoryResult>`
+
+List attempts with their latest evaluation and decision, replayability, pin state,
+legacy marker, and Git materialization state.
+
+---
+
+#### `agent.replayAutoresearch(params: AutoresearchReplayParams): Promise<AutoresearchReplayResult>`
+
+Reconstruct and evaluate a stored candidate in an isolated worktree. `evaluator`
+is `'original'` by default and may be set to `'current'`. The result includes raw
+samples, metrics, an appended decision, and environment drift warnings.
+
+---
+
+#### `agent.rescoreAutoresearch(params: AutoresearchRescoreParams): Promise<AutoresearchRescoreResult>`
+
+Append decisions using stored measurements and the current policy without running
+benchmarks. Pass `{ attemptId }` or `{ all: true }`. Rescoring never materializes
+or commits a candidate.
+
+---
+
+#### `agent.compareAutoresearch(params: AutoresearchCompareParams): Promise<AutoresearchCompareResult>`
+
+Compare raw samples, median/MAD aggregates, checks, execution outcomes, and latest
+decisions for `leftAttemptId` and `rightAttemptId`.
+
+---
+
+#### `agent.getAutoresearchPareto(): Promise<AutoresearchParetoResult>`
+
+List constraint-passing non-dominated candidate IDs. Pareto ranking is advisory.
+
+---
+
+#### `agent.pinAutoresearch(params: AutoresearchPinParams): Promise<AutoresearchPinResult>`
+
+Set `{ attemptId, pinned: true }` to protect replay artifacts from automatic
+retention, or `pinned: false` to release them.
+
+---
+
+#### `agent.pruneAutoresearch(params?: AutoresearchPruneParams): Promise<AutoresearchPruneResult>`
+
+Preview retention with `{ dryRun: true }` or no parameters. Artifact deletion
+requires `{ dryRun: false, yes: true }`. Ledger metadata remains permanent even
+when explicitly approved artifacts are removed.
 
 ---
 
@@ -398,6 +503,28 @@ await sdk.close();
 ```
 
 **Returns:** `Promise<void>`
+
+---
+
+#### Replayable autoresearch methods
+
+After `sdk.start()`, the low-level client exposes the same result types and RPC
+operations as `Agent`:
+
+- `sdk.startAutoresearch(params)`
+- `sdk.getAutoresearchStatus()`
+- `sdk.stopAutoresearch()`
+- `sdk.getAutoresearchHistory()`
+- `sdk.replayAutoresearch(params)`
+- `sdk.rescoreAutoresearch(params)`
+- `sdk.compareAutoresearch(params)`
+- `sdk.getAutoresearchPareto()`
+- `sdk.pinAutoresearch(params)`
+- `sdk.pruneAutoresearch(params?)`
+
+Drive a newly started loop by passing its returned instruction to
+`sdk.streamPrompt({ message: started.instruction })`. See
+[Autoresearch ledger](#autoresearch-ledger) for parameter and safety details.
 
 ---
 

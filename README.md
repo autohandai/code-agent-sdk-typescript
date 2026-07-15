@@ -106,35 +106,48 @@ if (await agent.supportsCommand('/autoresearch')) {
   await (await agent.autoresearch('Improve benchmark accuracy')).wait();
 }
 
+const measureScript = [
+  'set -euo pipefail',
+  'started="$(bun -e \'process.stdout.write(String(Date.now()))\')"',
+  'bun run test',
+  'finished="$(bun -e \'process.stdout.write(String(Date.now()))\')"',
+  'printf \'METRIC test_ms=%s\\n\' "$((finished - started))"',
+].join('\n');
+
 const started = await agent.startAutoresearch({
   objective: 'Reduce test runtime',
-  metricName: 'total_ms',
+  metricName: 'test_ms',
   metricUnit: 'ms',
   direction: 'lower',
-  measureCommand: 'bun test',
-  checksCommand: 'bun run lint',
-  maxIterations: 12,
+  measureScript,
+  checksCommand: 'bun run typecheck && bun run lint',
+  maxIterations: 3,
   filesInScope: ['src', 'tests'],
-  secondaryObjectives: [{ name: 'peak_mb', unit: 'MB', direction: 'lower' }],
-  constraints: [{ metricName: 'accuracy', operator: '>=', threshold: 0.99 }],
   sampling: { minSamples: 3, maxSamples: 9, confidenceThreshold: 2 },
 });
 
+if (!started.success || !started.instruction) {
+  throw new Error(started.error ?? 'Autoresearch could not start.');
+}
+
+const experiment = await agent.send(started.instruction);
+for await (const event of experiment.stream()) {
+  if (event.type === 'message_update') process.stdout.write(event.delta);
+}
+await experiment.wait();
+
 const status = await agent.getAutoresearchStatus();
 const history = await agent.getAutoresearchHistory();
-const [candidate, reference] = history.attempts;
+const candidate = history.attempts.find((attempt) =>
+  attempt.replayable && attempt.materialization !== 'baseline'
+);
 if (candidate) {
   await agent.replayAutoresearch({
     attemptId: candidate.attemptId,
     evaluator: 'original',
   });
+  await agent.rescoreAutoresearch({ attemptId: candidate.attemptId });
   await agent.pinAutoresearch({ attemptId: candidate.attemptId, pinned: true });
-}
-if (candidate && reference) {
-  await agent.compareAutoresearch({
-    leftAttemptId: candidate.attemptId,
-    rightAttemptId: reference.attemptId,
-  });
 }
 const pareto = await agent.getAutoresearchPareto();
 await agent.pruneAutoresearch({ dryRun: true });
@@ -149,6 +162,11 @@ configuration, replayable history, rescoring, comparison, Pareto analysis,
 pinning, retention previews, and typed lifecycle and ledger-operation events.
 Pruning previews by default; pass `{ yes: true }` only when artifact deletion is
 intentional.
+
+Read the [replayable autoresearch guide](./docs/autoresearch.md) for the metric
+contract, clean-Git requirements, adaptive decisions, replay drift, and retention
+safety. The complete runnable program is
+[`examples/27-autoresearch-ledger.ts`](./examples/27-autoresearch-ledger.ts).
 
 ### Low-Level API
 
@@ -443,6 +461,7 @@ The SDK emits the following events:
 - `tool_update` - Tool output update (streaming)
 - `tool_end` - Tool execution ended
 - `permission_request` - Permission request from agent
+- `autoresearch` - Autoresearch lifecycle or typed ledger-operation event
 - `error` - Error occurred
 
 `turn_end` includes provider-reported `tokensUsed`, `tokensUsageStatus`,
@@ -461,8 +480,11 @@ See the `examples/` directory for more examples:
 - `23-system-prompts.ts` - Replacing or appending the CLI system prompt
 - `24-high-level-agent.ts` - Recommended Agent/Run API
 - `25-structured-json.ts` - JSON output with optional validation
+- `26-runtime-error-to-pr.ts` - Turn a captured runtime error into a repair pull request
+- `27-autoresearch-ledger.ts` - Replayable autoresearch lifecycle and ledger analysis
 
-See also [SDLC workflows](./docs/sdlc-workflows.md).
+See also [SDLC workflows](./docs/sdlc-workflows.md) and the
+[replayable autoresearch guide](./docs/autoresearch.md).
 
 ## CLI Binaries
 

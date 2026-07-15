@@ -152,5 +152,6 @@ await agent.close();
 ## Next Steps
 
 - See the `examples/` directory for complete, runnable scripts covering streaming, file editing, permission handling, memory management, and SDLC workflows.
+- Build a replayable experiment with `examples/27-autoresearch-ledger.ts` and read `docs/autoresearch.md` for metric, replay, rescore, Pareto, and retention semantics.
 - Read `docs/sdlc-workflows.md` for patterns that separate planning from execution.
 - Check the README API reference for every method and event type.

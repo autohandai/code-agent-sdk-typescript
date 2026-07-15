@@ -38,6 +38,7 @@
 
 ## Unreleased
 
+- Added a published replayable-autoresearch guide and runnable ledger example.
 - Added typed autoresearch start, status, and stop RPC methods.
 - Added autoresearch lifecycle events, hook types, benchmark options, and persisted state types.
 - Registered `/autoresearch` as a current CLI capability alongside the streamed slash-command helper.

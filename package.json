@@ -28,6 +28,9 @@
     "cli",
     "README.md",
     "CHANGELOG.md",
+    "docs/autoresearch.md",
+    "examples/27-autoresearch-ledger.ts",
+    "tsconfig.examples.json",
     "LICENSE"
   ],
   "publishConfig": {
@@ -37,12 +40,13 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "typecheck:examples": "tsc -p tsconfig.examples.json",
     "lint": "eslint src --ext .ts",
     "test": "bun test src/__tests__",
     "test:examples": "bun run examples/test-examples.ts",
     "build:example:structured-json": "node scripts/build-examples.mjs examples/25-structured-json.ts",
     "build:examples": "node scripts/build-examples.mjs",
-    "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run lint"
+    "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run typecheck:examples && bun run test:examples && bun run build:examples && bun run lint"
   },
   "keywords": [
     "sdk",
