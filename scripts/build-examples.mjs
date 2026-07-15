@@ -28,6 +28,8 @@ const result = spawnSync('bun', [
   '--outdir',
   outputDir,
   '--target=node',
+  '--external',
+  '@autohandai/agent-sdk',
 ], {
   cwd: repoRoot,
   stdio: 'inherit',

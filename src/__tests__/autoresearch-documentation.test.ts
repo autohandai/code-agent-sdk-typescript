@@ -76,4 +76,11 @@ describe('autoresearch SDK documentation', () => {
     expect(packageJson.scripts?.prepublishOnly).toContain('bun run build:examples');
     expect(readRepositoryFile('tsconfig.examples.json')).toContain('examples/27-autoresearch-ledger.ts');
   });
+
+  it('keeps the public package import external when repository examples are bundled', () => {
+    const exampleBuilder = readRepositoryFile('scripts/build-examples.mjs');
+
+    expect(exampleBuilder).toContain("'--external'");
+    expect(exampleBuilder).toContain("'@autohandai/agent-sdk'");
+  });
 });
