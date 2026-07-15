@@ -83,6 +83,11 @@ describe('CLI feature parity', () => {
       timeoutMs: 60_000,
       filesInScope: ['src', 'tests'],
       subagents: { ideaGeneration: true },
+      secondaryObjectives: [{ name: 'peak_mb', unit: 'MB', direction: 'lower' }],
+      constraints: [{ metricName: 'accuracy', operator: '>=', threshold: 0.99 }],
+      sampling: { minSamples: 3, maxSamples: 9, confidenceThreshold: 2 },
+      retention: { maxArtifactBytes: 50_000_000, maxArtifactAgeDays: 30 },
+      environmentAllowlist: ['CI'],
     });
     await client.getAutoresearchStatus();
     await client.stopAutoresearch();
@@ -101,10 +106,113 @@ describe('CLI feature parity', () => {
           timeoutMs: 60_000,
           filesInScope: ['src', 'tests'],
           subagents: { ideaGeneration: true },
+          secondaryObjectives: [{ name: 'peak_mb', unit: 'MB', direction: 'lower' }],
+          constraints: [{ metricName: 'accuracy', operator: '>=', threshold: 0.99 }],
+          sampling: { minSamples: 3, maxSamples: 9, confidenceThreshold: 2 },
+          retention: { maxArtifactBytes: 50_000_000, maxArtifactAgeDays: 30 },
+          environmentAllowlist: ['CI'],
         },
       },
       { method: 'autohand.autoresearch.status', params: {} },
       { method: 'autohand.autoresearch.stop', params: {} },
+    ]);
+  });
+
+  it('routes replayable autoresearch ledger operations through exact RPC methods', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return { success: true };
+    };
+
+    await client.getAutoresearchHistory();
+    await client.replayAutoresearch({ attemptId: 'attempt-1', evaluator: 'original' });
+    await client.rescoreAutoresearch({ attemptId: 'attempt-1' });
+    await client.compareAutoresearch({ leftAttemptId: 'attempt-1', rightAttemptId: 'attempt-2' });
+    await client.getAutoresearchPareto();
+    await client.pinAutoresearch({ attemptId: 'attempt-1', pinned: true });
+    await client.pruneAutoresearch({ dryRun: false, yes: true });
+
+    expect(calls).toEqual([
+      { method: 'autohand.autoresearch.history', params: {} },
+      {
+        method: 'autohand.autoresearch.replay',
+        params: { attemptId: 'attempt-1', evaluator: 'original' },
+      },
+      { method: 'autohand.autoresearch.rescore', params: { attemptId: 'attempt-1' } },
+      {
+        method: 'autohand.autoresearch.compare',
+        params: { leftAttemptId: 'attempt-1', rightAttemptId: 'attempt-2' },
+      },
+      { method: 'autohand.autoresearch.pareto', params: {} },
+      {
+        method: 'autohand.autoresearch.pin',
+        params: { attemptId: 'attempt-1', pinned: true },
+      },
+      { method: 'autohand.autoresearch.prune', params: { dryRun: false, yes: true } },
+    ]);
+  });
+
+  it('exposes replayable autoresearch operations through Agent', async () => {
+    const calls: Array<{ operation: string; params?: unknown }> = [];
+    const sdk = {
+      getAutoresearchHistory: async () => {
+        calls.push({ operation: 'history' });
+        return { success: true, attempts: [] };
+      },
+      replayAutoresearch: async (params: unknown) => {
+        calls.push({ operation: 'replay', params });
+        return { success: true };
+      },
+      rescoreAutoresearch: async (params: unknown) => {
+        calls.push({ operation: 'rescore', params });
+        return { success: true, decisions: [] };
+      },
+      compareAutoresearch: async (params: unknown) => {
+        calls.push({ operation: 'compare', params });
+        return { success: true };
+      },
+      getAutoresearchPareto: async () => {
+        calls.push({ operation: 'pareto' });
+        return { success: true, attemptIds: [] };
+      },
+      pinAutoresearch: async (params: unknown) => {
+        calls.push({ operation: 'pin', params });
+        return { success: true, attemptId: 'attempt-1', pinned: true };
+      },
+      pruneAutoresearch: async (params: unknown) => {
+        calls.push({ operation: 'prune', params });
+        return {
+          success: true,
+          applied: false,
+          candidates: [],
+          bytesFreed: 0,
+          remainingBytes: 0,
+        };
+      },
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+
+    await agent.getAutoresearchHistory();
+    await agent.replayAutoresearch({ attemptId: 'attempt-1' });
+    await agent.rescoreAutoresearch({ all: true });
+    await agent.compareAutoresearch({ leftAttemptId: 'attempt-1', rightAttemptId: 'attempt-2' });
+    await agent.getAutoresearchPareto();
+    await agent.pinAutoresearch({ attemptId: 'attempt-1', pinned: true });
+    await agent.pruneAutoresearch({ dryRun: true });
+
+    expect(calls).toEqual([
+      { operation: 'history' },
+      { operation: 'replay', params: { attemptId: 'attempt-1' } },
+      { operation: 'rescore', params: { all: true } },
+      {
+        operation: 'compare',
+        params: { leftAttemptId: 'attempt-1', rightAttemptId: 'attempt-2' },
+      },
+      { operation: 'pareto' },
+      { operation: 'pin', params: { attemptId: 'attempt-1', pinned: true } },
+      { operation: 'prune', params: { dryRun: true } },
     ]);
   });
 
@@ -215,5 +323,9 @@ describe('CLI feature parity', () => {
 
   it('includes the goal authoring lifecycle hook', () => {
     expect(HOOK_EVENTS).toContain('goal-written:completed');
+    expect(HOOK_EVENTS).toContain('autoresearch:decision');
+    expect(HOOK_EVENTS).toContain('autoresearch:replay');
+    expect(HOOK_EVENTS).toContain('autoresearch:rescore');
+    expect(HOOK_EVENTS).toContain('autoresearch:prune');
   });
 });

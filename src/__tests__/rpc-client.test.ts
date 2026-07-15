@@ -114,6 +114,31 @@ describe('RPC Client Notification Handling', () => {
     });
   });
 
+  it('maps autoresearch ledger notifications to typed operation events', async () => {
+    const client = new RPCClient({ debug: false });
+
+    getTransport(client).handleLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'autohand.autoresearch.event',
+      params: {
+        operation: 'replay',
+        phase: 'completed',
+        attemptId: 'attempt-1',
+        success: true,
+        timestamp: '2026-07-15T00:00:00.000Z',
+      },
+    }));
+
+    expect(await nextEvent(client)).toEqual({
+      type: 'autoresearch',
+      operation: 'replay',
+      phase: 'completed',
+      attemptId: 'attempt-1',
+      success: true,
+      timestamp: '2026-07-15T00:00:00.000Z',
+    });
+  });
+
   it('uses the CLI-3 RPC method names for runtime control', async () => {
     const client = new RPCClient({ debug: false });
     const calls: Array<{ method: string; params?: unknown }> = [];

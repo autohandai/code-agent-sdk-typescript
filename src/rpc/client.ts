@@ -59,7 +59,20 @@ import type {
   AutoresearchStartResult,
   AutoresearchStatusResult,
   AutoresearchStopResult,
-  AutoresearchEvent,
+  AutoresearchHistoryResult,
+  AutoresearchReplayParams,
+  AutoresearchReplayResult,
+  AutoresearchRescoreParams,
+  AutoresearchRescoreResult,
+  AutoresearchCompareParams,
+  AutoresearchCompareResult,
+  AutoresearchParetoResult,
+  AutoresearchPinParams,
+  AutoresearchPinResult,
+  AutoresearchPruneParams,
+  AutoresearchPruneResult,
+  AutoresearchLifecycleEvent,
+  AutoresearchOperationEvent,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 
@@ -424,6 +437,34 @@ export class RPCClient {
     return this.transport.request('autohand.autoresearch.stop', {}) as Promise<AutoresearchStopResult>;
   }
 
+  async getAutoresearchHistory(): Promise<AutoresearchHistoryResult> {
+    return this.transport.request('autohand.autoresearch.history', {}) as Promise<AutoresearchHistoryResult>;
+  }
+
+  async replayAutoresearch(params: AutoresearchReplayParams): Promise<AutoresearchReplayResult> {
+    return this.transport.request('autohand.autoresearch.replay', params) as Promise<AutoresearchReplayResult>;
+  }
+
+  async rescoreAutoresearch(params: AutoresearchRescoreParams): Promise<AutoresearchRescoreResult> {
+    return this.transport.request('autohand.autoresearch.rescore', params) as Promise<AutoresearchRescoreResult>;
+  }
+
+  async compareAutoresearch(params: AutoresearchCompareParams): Promise<AutoresearchCompareResult> {
+    return this.transport.request('autohand.autoresearch.compare', params) as Promise<AutoresearchCompareResult>;
+  }
+
+  async getAutoresearchPareto(): Promise<AutoresearchParetoResult> {
+    return this.transport.request('autohand.autoresearch.pareto', {}) as Promise<AutoresearchParetoResult>;
+  }
+
+  async pinAutoresearch(params: AutoresearchPinParams): Promise<AutoresearchPinResult> {
+    return this.transport.request('autohand.autoresearch.pin', params) as Promise<AutoresearchPinResult>;
+  }
+
+  async pruneAutoresearch(params: AutoresearchPruneParams = {}): Promise<AutoresearchPruneResult> {
+    return this.transport.request('autohand.autoresearch.prune', params) as Promise<AutoresearchPruneResult>;
+  }
+
   /**
    * Get context usage
    * 
@@ -669,8 +710,8 @@ export class RPCClient {
       this.queueEvent(event);
     });
 
-    const queueAutoresearchEvent = (phase: AutoresearchEvent['phase'], params: unknown): void => {
-      const p = params as Omit<AutoresearchEvent, 'type' | 'phase'>;
+    const queueAutoresearchEvent = (phase: AutoresearchLifecycleEvent['phase'], params: unknown): void => {
+      const p = params as Omit<AutoresearchLifecycleEvent, 'type' | 'phase'>;
       this.queueEvent({
         type: 'autoresearch',
         phase,
@@ -694,6 +735,19 @@ export class RPCClient {
     });
     this.transport.onNotification('autohand.autoresearch.pause', (params) => {
       queueAutoresearchEvent('pause', params);
+    });
+    this.transport.onNotification('autohand.autoresearch.event', (params) => {
+      const p = params as Omit<AutoresearchOperationEvent, 'type'>;
+      this.queueEvent({
+        type: 'autoresearch',
+        operation: p.operation,
+        phase: p.phase,
+        success: p.success,
+        timestamp: p.timestamp,
+        ...(p.attemptId !== undefined ? { attemptId: p.attemptId } : {}),
+        ...(p.applied !== undefined ? { applied: p.applied } : {}),
+        ...(p.error !== undefined ? { error: p.error } : {}),
+      });
     });
 
     // Errors

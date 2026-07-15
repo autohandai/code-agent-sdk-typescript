@@ -65,6 +65,18 @@ import type {
   AutoresearchStartResult,
   AutoresearchStatusResult,
   AutoresearchStopResult,
+  AutoresearchHistoryResult,
+  AutoresearchReplayParams,
+  AutoresearchReplayResult,
+  AutoresearchRescoreParams,
+  AutoresearchRescoreResult,
+  AutoresearchCompareParams,
+  AutoresearchCompareResult,
+  AutoresearchParetoResult,
+  AutoresearchPinParams,
+  AutoresearchPinResult,
+  AutoresearchPruneParams,
+  AutoresearchPruneResult,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
 
@@ -866,6 +878,48 @@ export class AutohandSDK {
   async stopAutoresearch(): Promise<AutoresearchStopResult> {
     await this.ensureStarted();
     return this.client.stopAutoresearch();
+  }
+
+  /** List persisted autoresearch attempts and their replayability and materialization state. */
+  async getAutoresearchHistory(): Promise<AutoresearchHistoryResult> {
+    await this.ensureStarted();
+    return this.client.getAutoresearchHistory();
+  }
+
+  /** Replay a persisted candidate in an isolated worktree. */
+  async replayAutoresearch(params: AutoresearchReplayParams): Promise<AutoresearchReplayResult> {
+    await this.ensureStarted();
+    return this.client.replayAutoresearch(params);
+  }
+
+  /** Reapply the current decision policy to persisted measurements without benchmarking. */
+  async rescoreAutoresearch(params: AutoresearchRescoreParams): Promise<AutoresearchRescoreResult> {
+    await this.ensureStarted();
+    return this.client.rescoreAutoresearch(params);
+  }
+
+  /** Compare persisted measurements and decisions for two attempts. */
+  async compareAutoresearch(params: AutoresearchCompareParams): Promise<AutoresearchCompareResult> {
+    await this.ensureStarted();
+    return this.client.compareAutoresearch(params);
+  }
+
+  /** List the current constraint-passing Pareto frontier. */
+  async getAutoresearchPareto(): Promise<AutoresearchParetoResult> {
+    await this.ensureStarted();
+    return this.client.getAutoresearchPareto();
+  }
+
+  /** Pin or unpin a candidate's replay artifacts. */
+  async pinAutoresearch(params: AutoresearchPinParams): Promise<AutoresearchPinResult> {
+    await this.ensureStarted();
+    return this.client.pinAutoresearch(params);
+  }
+
+  /** Preview artifact pruning unless explicit confirmation is provided. */
+  async pruneAutoresearch(params: AutoresearchPruneParams = {}): Promise<AutoresearchPruneResult> {
+    await this.ensureStarted();
+    return this.client.pruneAutoresearch(params);
   }
 
   async getGoal(): Promise<GoalSnapshotResult> {

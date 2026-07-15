@@ -1486,6 +1486,29 @@ export interface AutoresearchSubagentOptions {
   finalization?: boolean;
 }
 
+export interface AutoresearchSecondaryObjective {
+  name: string;
+  unit: string;
+  direction: AutoresearchOptimizationDirection;
+}
+
+export interface AutoresearchConstraint {
+  metricName: string;
+  operator: '<' | '<=' | '>' | '>=';
+  threshold: number;
+}
+
+export interface AutoresearchSamplingOptions {
+  minSamples?: number;
+  maxSamples?: number;
+  confidenceThreshold?: number;
+}
+
+export interface AutoresearchRetentionOptions {
+  maxArtifactBytes?: number;
+  maxArtifactAgeDays?: number;
+}
+
 export interface AutoresearchStartParams {
   objective: string;
   maxIterations?: number;
@@ -1499,6 +1522,98 @@ export interface AutoresearchStartParams {
   checksScript?: string;
   filesInScope?: string[];
   subagents?: AutoresearchSubagentOptions;
+  secondaryObjectives?: AutoresearchSecondaryObjective[];
+  constraints?: AutoresearchConstraint[];
+  sampling?: AutoresearchSamplingOptions;
+  retention?: AutoresearchRetentionOptions;
+  environmentAllowlist?: string[];
+}
+
+export type AutoresearchJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | AutoresearchJsonValue[]
+  | { [key: string]: AutoresearchJsonValue };
+
+export interface AutoresearchMetricAggregate {
+  median: number;
+  mad: number;
+  sampleCount: number;
+}
+
+export interface AutoresearchEvaluationSample {
+  sequence: number;
+  metrics: Record<string, number>;
+  outputObject: string;
+  durationMs: number;
+  timestamp: string;
+}
+
+export interface AutoresearchEvaluationRecord {
+  schemaVersion: 1;
+  type: 'evaluation';
+  id: string;
+  attemptId: string;
+  timestamp: string;
+  context: Record<string, AutoresearchJsonValue>;
+  evaluatorMode: 'original' | 'current';
+  samples: AutoresearchEvaluationSample[];
+  aggregates: Record<string, AutoresearchMetricAggregate>;
+  checks: {
+    passed: boolean;
+    outputObject?: string;
+  };
+  execution: {
+    outcome: 'passed' | 'benchmark_failed' | 'checks_failed' | 'cancelled';
+    error?: string;
+    outputObject?: string;
+  };
+  driftWarnings: string[];
+}
+
+export interface AutoresearchConstraintResult extends AutoresearchConstraint {
+  conservativeValue: number;
+  passed: boolean;
+  conclusive: boolean;
+}
+
+export interface AutoresearchDecisionRecord {
+  schemaVersion: 1;
+  type: 'decision';
+  id: string;
+  attemptId: string;
+  timestamp: string;
+  context: Record<string, AutoresearchJsonValue>;
+  policyVersion: string;
+  evaluationId: string;
+  source: 'original' | 'replay' | 'rescore';
+  constraintResults: AutoresearchConstraintResult[];
+  primaryImprovement: number;
+  confidence: number;
+  outcome: 'accepted' | 'rejected' | 'inconclusive' | 'checks_failed' | 'crashed';
+  materialized: boolean;
+  explanation: string;
+}
+
+export type AutoresearchMaterializationState =
+  | 'baseline'
+  | 'committed'
+  | 'retained'
+  | 'reverted'
+  | 'none';
+
+export interface AutoresearchHistoryAttempt {
+  attemptId: string;
+  description: string;
+  timestamp: string;
+  legacy: boolean;
+  replayable: boolean;
+  pinned: boolean;
+  latestEvaluation?: AutoresearchEvaluationRecord;
+  latestDecision?: AutoresearchDecisionRecord;
+  materialization: AutoresearchMaterializationState;
 }
 
 export interface AutoresearchState {
@@ -1516,6 +1631,8 @@ export interface AutoresearchStartResult {
   state?: AutoresearchState;
   statusText?: string;
   runsLogged?: number;
+  attempts?: AutoresearchHistoryAttempt[];
+  paretoAttemptIds?: string[];
   error?: string;
 }
 
@@ -1525,6 +1642,8 @@ export interface AutoresearchStatusResult {
   state?: AutoresearchState;
   statusText: string;
   runsLogged: number;
+  attempts?: AutoresearchHistoryAttempt[];
+  paretoAttemptIds?: string[];
   error?: string;
 }
 
@@ -1535,6 +1654,105 @@ export interface AutoresearchStopResult {
   state?: AutoresearchState;
   statusText?: string;
   runsLogged?: number;
+  attempts?: AutoresearchHistoryAttempt[];
+  paretoAttemptIds?: string[];
+  error?: string;
+}
+
+export interface AutoresearchHistoryResult {
+  success: boolean;
+  attempts: AutoresearchHistoryAttempt[];
+  error?: string;
+}
+
+export interface AutoresearchReplayParams {
+  attemptId: string;
+  evaluator?: 'original' | 'current';
+}
+
+export interface AutoresearchReplayResult {
+  success: boolean;
+  attemptId?: string;
+  evaluatorMode?: 'original' | 'current';
+  metrics?: Record<string, number>;
+  samples?: AutoresearchEvaluationSample[];
+  decision?: AutoresearchDecisionRecord;
+  driftWarnings?: string[];
+  error?: string;
+}
+
+export type AutoresearchRescoreParams =
+  | { attemptId: string; all?: false }
+  | { attemptId?: never; all: true };
+
+export interface AutoresearchRescoreResult {
+  success: boolean;
+  decisions: AutoresearchDecisionRecord[];
+  error?: string;
+}
+
+export interface AutoresearchCompareParams {
+  leftAttemptId: string;
+  rightAttemptId: string;
+}
+
+export interface AutoresearchComparisonSide {
+  attemptId: string;
+  samples: AutoresearchEvaluationSample[];
+  aggregates: Record<string, AutoresearchMetricAggregate>;
+  checks: AutoresearchEvaluationRecord['checks'];
+  execution: AutoresearchEvaluationRecord['execution'];
+  decision?: AutoresearchDecisionRecord;
+}
+
+export interface AutoresearchComparison {
+  left: AutoresearchComparisonSide;
+  right: AutoresearchComparisonSide;
+}
+
+export interface AutoresearchCompareResult {
+  success: boolean;
+  comparison?: AutoresearchComparison;
+  error?: string;
+}
+
+export interface AutoresearchParetoResult {
+  success: boolean;
+  attemptIds: string[];
+  error?: string;
+}
+
+export interface AutoresearchPinParams {
+  attemptId: string;
+  pinned: boolean;
+}
+
+export interface AutoresearchPinResult {
+  success: boolean;
+  attemptId: string;
+  pinned: boolean;
+  error?: string;
+}
+
+export interface AutoresearchPruneParams {
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+export interface AutoresearchPruneCandidate {
+  attemptId: string;
+  objects: string[];
+  bytes: number;
+  protected: boolean;
+  reason: string;
+}
+
+export interface AutoresearchPruneResult {
+  success: boolean;
+  applied: boolean;
+  candidates: AutoresearchPruneCandidate[];
+  bytesFreed: number;
+  remainingBytes: number;
   error?: string;
 }
 
@@ -1749,6 +1967,7 @@ export type SDKEvent =
   | FileModifiedEvent
   | PermissionRequestEvent
   | AutoresearchEvent
+  | AutoresearchOperationEvent
   | ErrorEvent;
 
 export interface AutoresearchEvent {
@@ -1764,6 +1983,28 @@ export interface AutoresearchEvent {
   message?: string;
   timestamp: string;
 }
+
+export type AutoresearchOperation =
+  | 'history'
+  | 'replay'
+  | 'rescore'
+  | 'compare'
+  | 'pareto'
+  | 'pin'
+  | 'prune';
+
+export interface AutoresearchOperationEvent {
+  type: 'autoresearch';
+  operation: AutoresearchOperation;
+  phase: 'started' | 'completed' | 'failed';
+  attemptId?: string;
+  success: boolean;
+  applied?: boolean;
+  error?: string;
+  timestamp: string;
+}
+
+export type AutoresearchLifecycleEvent = AutoresearchEvent;
 
 export interface AgentStartEvent {
   type: 'agent_start';
@@ -1924,6 +2165,10 @@ export type HookEvent =
   | 'autoresearch:run'
   | 'autoresearch:after'
   | 'autoresearch:log'
+  | 'autoresearch:decision'
+  | 'autoresearch:replay'
+  | 'autoresearch:rescore'
+  | 'autoresearch:prune'
   | 'autoresearch:complete'
   | 'autoresearch:error'
   // Learn events
@@ -1982,6 +2227,10 @@ export const HOOK_EVENTS = [
   'autoresearch:run',
   'autoresearch:after',
   'autoresearch:log',
+  'autoresearch:decision',
+  'autoresearch:replay',
+  'autoresearch:rescore',
+  'autoresearch:prune',
   'autoresearch:complete',
   'autoresearch:error',
   'pre-learn',

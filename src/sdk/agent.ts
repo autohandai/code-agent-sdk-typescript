@@ -17,6 +17,18 @@ import type {
   AutoresearchStartResult,
   AutoresearchStatusResult,
   AutoresearchStopResult,
+  AutoresearchHistoryResult,
+  AutoresearchReplayParams,
+  AutoresearchReplayResult,
+  AutoresearchRescoreParams,
+  AutoresearchRescoreResult,
+  AutoresearchCompareParams,
+  AutoresearchCompareResult,
+  AutoresearchParetoResult,
+  AutoresearchPinParams,
+  AutoresearchPinResult,
+  AutoresearchPruneParams,
+  AutoresearchPruneResult,
 } from '../types/index.js';
 
 export type AgentInput = string | PromptParams;
@@ -474,6 +486,34 @@ export class Agent {
 
   async stopAutoresearch(): Promise<AutoresearchStopResult> {
     return this.sdk.stopAutoresearch();
+  }
+
+  async getAutoresearchHistory(): Promise<AutoresearchHistoryResult> {
+    return this.sdk.getAutoresearchHistory();
+  }
+
+  async replayAutoresearch(params: AutoresearchReplayParams): Promise<AutoresearchReplayResult> {
+    return this.sdk.replayAutoresearch(params);
+  }
+
+  async rescoreAutoresearch(params: AutoresearchRescoreParams): Promise<AutoresearchRescoreResult> {
+    return this.sdk.rescoreAutoresearch(params);
+  }
+
+  async compareAutoresearch(params: AutoresearchCompareParams): Promise<AutoresearchCompareResult> {
+    return this.sdk.compareAutoresearch(params);
+  }
+
+  async getAutoresearchPareto(): Promise<AutoresearchParetoResult> {
+    return this.sdk.getAutoresearchPareto();
+  }
+
+  async pinAutoresearch(params: AutoresearchPinParams): Promise<AutoresearchPinResult> {
+    return this.sdk.pinAutoresearch(params);
+  }
+
+  async pruneAutoresearch(params: AutoresearchPruneParams = {}): Promise<AutoresearchPruneResult> {
+    return this.sdk.pruneAutoresearch(params);
   }
 
   /**

@@ -115,17 +115,40 @@ const started = await agent.startAutoresearch({
   checksCommand: 'bun run lint',
   maxIterations: 12,
   filesInScope: ['src', 'tests'],
+  secondaryObjectives: [{ name: 'peak_mb', unit: 'MB', direction: 'lower' }],
+  constraints: [{ metricName: 'accuracy', operator: '>=', threshold: 0.99 }],
+  sampling: { minSamples: 3, maxSamples: 9, confidenceThreshold: 2 },
 });
 
 const status = await agent.getAutoresearchStatus();
+const history = await agent.getAutoresearchHistory();
+const [candidate, reference] = history.attempts;
+if (candidate) {
+  await agent.replayAutoresearch({
+    attemptId: candidate.attemptId,
+    evaluator: 'original',
+  });
+  await agent.pinAutoresearch({ attemptId: candidate.attemptId, pinned: true });
+}
+if (candidate && reference) {
+  await agent.compareAutoresearch({
+    leftAttemptId: candidate.attemptId,
+    rightAttemptId: reference.attemptId,
+  });
+}
+const pareto = await agent.getAutoresearchPareto();
+await agent.pruneAutoresearch({ dryRun: true });
 await agent.stopAutoresearch();
 ```
 
 `agent.command('/name', args)` supports any slash command reported by the
 connected CLI. `/deep-research` and `/autoresearch` are available in the current
 CLI. Use `supportsCommand()` when supporting older CLI versions. The typed
-autoresearch lifecycle methods use JSON-RPC and expose persisted state, run
-counts, benchmark configuration, and start/status/pause events.
+autoresearch methods use JSON-RPC and expose persisted state, adaptive benchmark
+configuration, replayable history, rescoring, comparison, Pareto analysis,
+pinning, retention previews, and typed lifecycle and ledger-operation events.
+Pruning previews by default; pass `{ yes: true }` only when artifact deletion is
+intentional.
 
 ### Low-Level API
 

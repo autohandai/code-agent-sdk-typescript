@@ -5,6 +5,9 @@
 - Added typed autoresearch start, status, and stop RPC methods.
 - Added autoresearch lifecycle events, hook types, benchmark options, and persisted state types.
 - Registered `/autoresearch` as a current CLI capability alongside the streamed slash-command helper.
+- Added typed autoresearch history, replay, rescore, comparison, Pareto, pin, and prune methods.
+- Added adaptive sampling, secondary objective, hard constraint, retention, and safe environment options.
+- Added replayable evaluation and decision records plus ledger-operation notification and hook phases.
 
 ## v1.0.1-alpha.2.2ff35ae - 2026-06-26
 
