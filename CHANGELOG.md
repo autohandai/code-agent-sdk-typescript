@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+## v1.0.3 - 2026-07-16
+
+> Stable release.
+
+### Changes
+
+- Added a published autoresearch and replayable-ledger guide with a runnable TypeScript example.
+- Documented the complete typed lifecycle across initialization, evaluation, replay, rescoring, comparison, Pareto analysis, pinning, and pruning.
+- Added strict example typechecking and clean-checkout bundling for the SDK's public self-import.
+- Added durable v1.0.2 and v1.0.3 release notes plus protected-branch recovery guidance.
+- Kept GitHub releases in draft state until npm publication succeeds and made historical note refreshes target the requested tag.
+
 ## v1.0.2-alpha.15.dbdc851 - 2026-07-15
 
 > Bleeding edge alpha build from main.
@@ -52,16 +66,6 @@
 - docs: clarify npm trusted publisher setup (d868449)
 - ci: use trusted publishing for npm releases (68bb73d)
 - ci: publish npm from sdk release workflow (9392e36)
-
-## Unreleased
-
-- Added a published replayable-autoresearch guide and runnable ledger example.
-- Added typed autoresearch start, status, and stop RPC methods.
-- Added autoresearch lifecycle events, hook types, benchmark options, and persisted state types.
-- Registered `/autoresearch` as a current CLI capability alongside the streamed slash-command helper.
-- Added typed autoresearch history, replay, rescore, comparison, Pareto, pin, and prune methods.
-- Added adaptive sampling, secondary objective, hard constraint, retention, and safe environment options.
-- Added replayable evaluation and decision records plus ledger-operation notification and hook phases.
 
 ## v1.0.1-alpha.2.2ff35ae - 2026-06-26
 
