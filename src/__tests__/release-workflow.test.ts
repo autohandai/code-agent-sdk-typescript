@@ -9,6 +9,13 @@ function readRepositoryFile(path: string): string {
   return readFileSync(join(repositoryRoot, path), 'utf8');
 }
 
+function readWorkflowStep(workflow: string, name: string): string {
+  const stepStart = workflow.indexOf(`      - name: ${name}`);
+  expect(stepStart >= 0).toBe(true);
+  const nextStep = workflow.indexOf('\n      - name:', stepStart + 1);
+  return workflow.slice(stepStart, nextStep < 0 ? undefined : nextStep);
+}
+
 describe('SDK release workflow', () => {
   it('builds historical notes from the requested tag and publishes GitHub only after npm', () => {
     const workflow = readRepositoryFile('.github/workflows/release.yml');
@@ -34,6 +41,10 @@ describe('SDK release workflow', () => {
     expect(workflow).toContain('release_notes_only requires an explicit version');
     expect(workflow).toContain('skip_npm_publish=true');
     expect(workflow).toContain("steps.version.outputs.release_notes_only != 'true' && steps.publish-state.outputs.skip_npm_publish != 'true'");
+
+    expect(readWorkflowStep(workflow, 'Update existing GitHub release with generated notes')).toContain('draft: true');
+    expect(readWorkflowStep(workflow, 'Update existing GitHub release')).toContain('draft: true');
+    expect(readWorkflowStep(workflow, 'Publish GitHub release')).toContain("if: steps.version.outputs.release_notes_only != 'true'");
   });
 
   it('documents the protected-main stable release path', () => {

@@ -460,6 +460,7 @@ jobs:
           body_path: release-notes.md
           generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
           previous_tag: ${{ steps.version.outputs.release_notes_previous_tag }}
+          draft: true
           prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             *.tgz
@@ -473,6 +474,7 @@ jobs:
           name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
           body_path: release-notes.md
           generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          draft: true
           prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             *.tgz
@@ -508,6 +510,7 @@ jobs:
           npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.version.outputs.dist_tag }}"
 
       - name: Publish GitHub release
+        if: steps.version.outputs.release_notes_only != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
