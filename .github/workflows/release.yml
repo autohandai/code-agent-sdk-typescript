@@ -16,11 +16,16 @@ on:
           - minor
           - major
       version:
-        description: Explicit stable version, for example 1.0.2
+        description: Explicit stable version, for example 1.0.3
         required: false
         type: string
       publish_existing:
-        description: Publish current version when the GitHub release already exists
+        description: Publish or repair the version already recorded in package.json
+        required: true
+        default: false
+        type: boolean
+      release_notes_only:
+        description: Refresh GitHub release notes for an existing tag without npm publishing
         required: true
         default: false
         type: boolean
@@ -60,6 +65,7 @@ jobs:
           fetch-depth: 0
           lfs: true
           persist-credentials: true
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
 
       - name: Restore Git LFS assets
         run: |
@@ -90,13 +96,19 @@ jobs:
           BUMP_INPUT: ${{ inputs.bump }}
           DIST_TAG_INPUT: ${{ inputs.dist_tag }}
           PUBLISH_EXISTING_INPUT: ${{ inputs.publish_existing }}
+          RELEASE_NOTES_ONLY_INPUT: ${{ inputs.release_notes_only }}
         run: |
           set -euo pipefail
 
           publish_existing="${PUBLISH_EXISTING_INPUT:-false}"
-          latest_stable_tag="$(
+          release_notes_only="${RELEASE_NOTES_ONLY_INPUT:-false}"
+          stable_tags="$(
             git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true
+          )"
+          latest_stable_tag="$(
+            printf '%s\n' "$stable_tags" \
+              | grep -v '^$' \
               | head -n 1 || true
           )"
 
@@ -106,7 +118,18 @@ jobs:
             stable_base="$(node -p "require('./package.json').version.split('-')[0]")"
           fi
 
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$release_notes_only" = "true" ]; then
+            version="${VERSION_INPUT#v}"
+            if [ -z "$version" ]; then
+              echo "::error::release_notes_only requires an explicit version, for example 1.0.2."
+              exit 1
+            fi
+
+            publish_existing="true"
+            release_kind="notes"
+            prerelease="$([[ "$version" == *-* ]] && echo true || echo false)"
+            dist_tag="${DIST_TAG_INPUT:-latest}"
+          elif [ "$EVENT_NAME" = "push" ]; then
             short_sha="$(printf '%.7s' "$GITHUB_SHA")"
             version="${stable_base}-alpha.${GITHUB_RUN_NUMBER}.${short_sha}"
             release_kind="alpha"
@@ -165,41 +188,92 @@ jobs:
             exit 1
           fi
 
+          tag="v$version"
+          release_notes_previous_tag="$(
+            STABLE_TAGS="$stable_tags" TARGET_VERSION="$version" node <<'NODE'
+          const targetVersion = process.env.TARGET_VERSION ?? '';
+          const targetParts = targetVersion.split('-', 1)[0].split('.').map(Number);
+          const targetIsStable = !targetVersion.includes('-');
+          const tags = (process.env.STABLE_TAGS ?? '')
+            .split('\n')
+            .filter(Boolean)
+            .map((tag) => ({ tag, parts: tag.slice(1).split('.').map(Number) }));
+
+          const compare = (left, right) => {
+            for (let index = 0; index < 3; index += 1) {
+              const difference = (left[index] ?? 0) - (right[index] ?? 0);
+              if (difference !== 0) return difference;
+            }
+            return 0;
+          };
+
+          const previous = tags
+            .filter(({ parts }) => {
+              const comparison = compare(parts, targetParts);
+              return targetIsStable ? comparison < 0 : comparison <= 0;
+            })
+            .sort((left, right) => compare(left.parts, right.parts))
+            .at(-1);
+
+          if (previous) process.stdout.write(previous.tag);
+          NODE
+          )"
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_kind=$release_kind" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "publish_existing=$publish_existing" >> "$GITHUB_OUTPUT"
+          echo "release_notes_only=$release_notes_only" >> "$GITHUB_OUTPUT"
           echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
           echo "latest_stable_tag=$latest_stable_tag" >> "$GITHUB_OUTPUT"
+          echo "release_notes_previous_tag=$release_notes_previous_tag" >> "$GITHUB_OUTPUT"
 
-      - name: Update changelog
-        if: steps.version.outputs.publish_existing != 'true'
-        id: changelog
+      - name: Generate release notes
+        id: release-notes
         shell: bash
         run: |
           set -euo pipefail
 
           version="${{ steps.version.outputs.version }}"
           tag="${{ steps.version.outputs.tag }}"
-          latest_stable_tag="${{ steps.version.outputs.latest_stable_tag }}"
-          release_kind="${{ steps.version.outputs.release_kind }}"
+          release_notes_previous_tag="${{ steps.version.outputs.release_notes_previous_tag }}"
+          publish_existing="${{ steps.version.outputs.publish_existing }}"
+          prerelease="${{ steps.version.outputs.prerelease }}"
           date="$(date -u +%Y-%m-%d)"
+          curated_release_notes="docs/releases/${tag}.md"
+          notes_target="HEAD"
           range=""
 
-          if [ -n "$latest_stable_tag" ]; then
-            range="${latest_stable_tag}..HEAD"
+          if [ "$publish_existing" = "true" ] && [ -f "$curated_release_notes" ]; then
+            cp "$curated_release_notes" release-notes.md
+            echo "curated=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "curated=false" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse --verify --quiet "${tag}^{commit}" >/dev/null; then
+            notes_target="$tag"
+          fi
+
+          if [ -n "$release_notes_previous_tag" ]; then
+            range="${release_notes_previous_tag}..${notes_target}"
           fi
 
           {
             echo "## ${tag} - ${date}"
             echo
-            if [ "$release_kind" = "alpha" ]; then
+            if [ "$prerelease" = "true" ]; then
               echo "> Bleeding edge alpha build from main."
             else
               echo "> Stable release."
             fi
             echo
+            if [ -n "$release_notes_previous_tag" ]; then
+              echo "Compare: https://github.com/${GITHUB_REPOSITORY}/compare/${release_notes_previous_tag}...${tag}"
+              echo
+            fi
             echo "### Changes"
             echo
             if [ -n "$range" ]; then
@@ -216,6 +290,12 @@ jobs:
           fi
 
           printf '\n' >> release-notes.md
+
+      - name: Update changelog
+        if: steps.version.outputs.publish_existing != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
 
           if [ -f CHANGELOG.md ] && head -n 1 CHANGELOG.md | grep -qx '# Changelog'; then
             {
@@ -238,14 +318,24 @@ jobs:
           mv CHANGELOG.md.tmp CHANGELOG.md
 
       - name: Verify version is unpublished
+        if: steps.version.outputs.release_notes_only != 'true'
+        id: publish-state
         run: |
           package_name="$(node -p "require('./package.json').name")"
           package_version="${{ steps.version.outputs.version }}"
 
           if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+            if [ "${{ steps.version.outputs.publish_existing }}" = "true" ]; then
+              echo "$package_name@$package_version is already published on npm; refreshing the GitHub release without republishing."
+              echo "skip_npm_publish=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
             echo "::error::$package_name@$package_version is already published on npm."
             exit 1
           fi
+
+          echo "skip_npm_publish=false" >> "$GITHUB_OUTPUT"
 
           if [ "${{ steps.version.outputs.publish_existing }}" != "true" ] && git ls-remote --exit-code --tags origin "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             echo "::error::Tag ${{ steps.version.outputs.tag }} already exists on origin."
@@ -253,9 +343,11 @@ jobs:
           fi
 
       - name: Validate package
+        if: steps.version.outputs.release_notes_only != 'true'
         run: bun run prepublishOnly
 
       - name: Build release package artifact
+        if: steps.version.outputs.release_notes_only != 'true'
         run: |
           package_file="$(
             npm pack --json \
@@ -269,6 +361,7 @@ jobs:
           echo "PACKAGE_FILE=$package_file" >> "$GITHUB_ENV"
 
       - name: Configure npm token
+        if: steps.version.outputs.release_notes_only != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -282,6 +375,7 @@ jobs:
           fi
 
       - name: Verify npm publish access
+        if: steps.version.outputs.release_notes_only != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -313,18 +407,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json CHANGELOG.md
-          git commit -m "chore(release): ${{ steps.version.outputs.tag }}"
+          git commit \
+            -m "chore(release): ${{ steps.version.outputs.tag }}" \
+            -m "Prepare the validated package, changelog, and release tag." \
+            -m "Co-authored-by: Autohand Evolve <code-noreply@autohand.ai>"
 
       - name: Tag release
         if: steps.version.outputs.publish_existing != 'true'
         run: git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm install -g npm@latest
-          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.version.outputs.dist_tag }}"
 
       - name: Push version and tag
         if: steps.version.outputs.publish_existing != 'true'
@@ -332,14 +422,118 @@ jobs:
           git push origin HEAD:main
           git push origin "${{ steps.version.outputs.tag }}"
 
-      - name: Create GitHub release
-        if: steps.version.outputs.publish_existing != 'true'
+      - name: Prepare draft GitHub release with generated notes
+        if: steps.version.outputs.publish_existing != 'true' && steps.version.outputs.release_notes_previous_tag != ''
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
           body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          previous_tag: ${{ steps.version.outputs.release_notes_previous_tag }}
+          draft: true
           prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             *.tgz
             *.tgz.sha256
+
+      - name: Prepare draft GitHub release
+        if: steps.version.outputs.publish_existing != 'true' && steps.version.outputs.release_notes_previous_tag == ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          draft: true
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          files: |
+            *.tgz
+            *.tgz.sha256
+
+      - name: Update existing GitHub release with generated notes
+        if: steps.version.outputs.publish_existing == 'true' && steps.version.outputs.release_notes_only != 'true' && steps.version.outputs.release_notes_previous_tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          previous_tag: ${{ steps.version.outputs.release_notes_previous_tag }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          files: |
+            *.tgz
+            *.tgz.sha256
+
+      - name: Update existing GitHub release
+        if: steps.version.outputs.publish_existing == 'true' && steps.version.outputs.release_notes_only != 'true' && steps.version.outputs.release_notes_previous_tag == ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_kind == 'alpha' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          files: |
+            *.tgz
+            *.tgz.sha256
+
+      - name: Refresh existing GitHub release notes with generated notes
+        if: steps.version.outputs.release_notes_only == 'true' && steps.version.outputs.release_notes_previous_tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.prerelease == 'true' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          previous_tag: ${{ steps.version.outputs.release_notes_previous_tag }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+
+      - name: Refresh existing GitHub release notes
+        if: steps.version.outputs.release_notes_only == 'true' && steps.version.outputs.release_notes_previous_tag == ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.prerelease == 'true' && format('Bleeding Edge {0}', steps.version.outputs.tag) || format('Release {0}', steps.version.outputs.tag) }}
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.release-notes.outputs.curated != 'true' }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+
+      - name: Publish to npm
+        if: steps.version.outputs.release_notes_only != 'true' && steps.publish-state.outputs.skip_npm_publish != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm install -g npm@latest
+          npm publish "$PACKAGE_FILE" --access public --provenance --tag "${{ steps.version.outputs.dist_tag }}"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.version.outputs.tag }}"
+          prerelease="${{ steps.version.outputs.prerelease }}"
+          release_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+              --jq ".[] | select(.tag_name == \"$tag\") | .id" \
+              | head -n 1
+          )"
+
+          if [ -z "$release_id" ]; then
+            echo "::error::GitHub release for $tag was not found."
+            exit 1
+          fi
+
+          if [ "$prerelease" = "true" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=true \
+              -f make_latest=false
+          else
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=false \
+              -f make_latest=true
+          fi
