@@ -59,7 +59,7 @@
     "node": ">=18.17.0"
   },
   "dependencies": {
-    "toml": "^4.1.1",
+    "toml": "^5.0.0",
     "yaml": "^2.8.4"
   },
   "devDependencies": {
