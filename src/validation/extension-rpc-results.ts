@@ -9,6 +9,9 @@ import type {
   YoloSetResult,
   McpSetVscodeToolsResult,
   McpInvokeResponseResult,
+  LearnAuditEntry,
+  LearnRecommendation,
+  LearnRecommendResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -256,6 +259,63 @@ function mcpInvokeResponseResult(
   return { success: boolean(record.success, method, `${path}.success`) };
 }
 
+function learnAuditStatus(
+  value: unknown,
+  method: string,
+  path: string
+): LearnAuditEntry['status'] {
+  if (value === 'redundant' || value === 'outdated' || value === 'conflicting') return value;
+  return invalid(method, path, 'redundant | outdated | conflicting', value);
+}
+
+function learnAuditEntry(value: unknown, method: string, path: string): LearnAuditEntry {
+  const record = object(value, method, path);
+  return {
+    skill: string(record.skill, method, `${path}.skill`),
+    status: learnAuditStatus(record.status, method, `${path}.status`),
+    reason: string(record.reason, method, `${path}.reason`),
+  };
+}
+
+function learnRecommendation(
+  value: unknown,
+  method: string,
+  path: string
+): LearnRecommendation {
+  const record = object(value, method, path);
+  return {
+    slug: string(record.slug, method, `${path}.slug`),
+    score: number(record.score, method, `${path}.score`),
+    reason: string(record.reason, method, `${path}.reason`),
+  };
+}
+
+function learnRecommendResult(
+  value: unknown,
+  method: string,
+  path: string
+): LearnRecommendResult {
+  const record = object(value, method, path);
+  const result: LearnRecommendResult = {
+    success: boolean(record.success, method, `${path}.success`),
+    projectSummary: string(record.projectSummary, method, `${path}.projectSummary`),
+    audit: array(record.audit, method, `${path}.audit`, learnAuditEntry),
+    recommendations: array(
+      record.recommendations,
+      method,
+      `${path}.recommendations`,
+      learnRecommendation
+    ),
+    gapAnalysis: record.gapAnalysis === null
+      ? null
+      : string(record.gapAnalysis, method, `${path}.gapAnalysis`),
+  };
+  if (record.error !== undefined) {
+    result.error = string(record.error, method, `${path}.error`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -268,6 +328,7 @@ interface ExtensionRpcResultMap {
   'autohand.yolo.set': YoloSetResult;
   'autohand.mcp.setVscodeTools': McpSetVscodeToolsResult;
   'autohand.mcp.invokeResponse': McpInvokeResponseResult;
+  'autohand.learn.recommend': LearnRecommendResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -297,6 +358,8 @@ const validators: {
     mcpSetVscodeToolsResult(value, 'autohand.mcp.setVscodeTools', path),
   'autohand.mcp.invokeResponse': (value, path) =>
     mcpInvokeResponseResult(value, 'autohand.mcp.invokeResponse', path),
+  'autohand.learn.recommend': (value, path) =>
+    learnRecommendResult(value, 'autohand.learn.recommend', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

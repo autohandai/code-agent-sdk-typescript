@@ -2012,6 +2012,31 @@ export interface McpInvokeResponseResult {
   success: boolean;
 }
 
+export interface LearnRecommendParams {
+  deep?: boolean;
+}
+
+export interface LearnAuditEntry {
+  skill: string;
+  status: 'redundant' | 'outdated' | 'conflicting';
+  reason: string;
+}
+
+export interface LearnRecommendation {
+  slug: string;
+  score: number;
+  reason: string;
+}
+
+export interface LearnRecommendResult {
+  success: boolean;
+  projectSummary: string;
+  audit: LearnAuditEntry[];
+  recommendations: LearnRecommendation[];
+  gapAnalysis: string | null;
+  error?: string;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

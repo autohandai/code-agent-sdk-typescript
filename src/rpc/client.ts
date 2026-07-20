@@ -66,6 +66,8 @@ import type {
   McpSetVscodeToolsResult,
   McpInvokeResponseParams,
   McpInvokeResponseResult,
+  LearnRecommendParams,
+  LearnRecommendResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -578,6 +580,14 @@ export class RPCClient {
   ): Promise<McpInvokeResponseResult> {
     const result = await this.transport.request('autohand.mcp.invokeResponse', params);
     return validateExtensionRpcResult('autohand.mcp.invokeResponse', result);
+  }
+
+  /** Audit installed skills and recommend project-relevant additions. */
+  async getLearningRecommendations(
+    params: LearnRecommendParams = {}
+  ): Promise<LearnRecommendResult> {
+    const result = await this.transport.request('autohand.learn.recommend', params);
+    return validateExtensionRpcResult('autohand.learn.recommend', result);
   }
 
   /**

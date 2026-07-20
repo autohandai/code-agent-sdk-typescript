@@ -67,6 +67,8 @@ import type {
   McpSetVscodeToolsResult,
   McpInvokeResponseParams,
   McpInvokeResponseResult,
+  LearnRecommendParams,
+  LearnRecommendResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1625,6 +1627,14 @@ export class AutohandSDK {
   ): Promise<McpInvokeResponseResult> {
     await this.ensureStarted();
     return this.client.respondToMcpInvocation(params);
+  }
+
+  /** Audit installed skills and recommend project-relevant additions. */
+  async getLearningRecommendations(
+    params: LearnRecommendParams = {}
+  ): Promise<LearnRecommendResult> {
+    await this.ensureStarted();
+    return this.client.getLearningRecommendations(params);
   }
 
   /**

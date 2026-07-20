@@ -419,4 +419,48 @@ describe('extension RPC features', () => {
       sdk.respondToMcpInvocation(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.mcp\.invokeResponse/);
   });
+
+  it('gets project learning recommendations through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.learn.recommend',
+      params: { deep: true },
+      result: {
+        success: true,
+        projectSummary: 'TypeScript SDK',
+        audit: [{
+          skill: 'old-testing',
+          status: 'outdated' as const,
+          reason: 'Uses a retired command',
+        }],
+        recommendations: [{
+          slug: 'typescript-best-practices',
+          score: 0.97,
+          reason: 'Matches this repository',
+        }],
+        gapAnalysis: null,
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getLearningRecommendations(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects malformed project learning recommendation scores', async () => {
+    const fixture = {
+      method: 'autohand.learn.recommend',
+      params: {},
+      result: {
+        success: true,
+        projectSummary: 'SDK',
+        audit: [],
+        recommendations: [{ slug: 'testing', score: 'high', reason: 'Useful' }],
+        gapAnalysis: 'Needs integration testing',
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getLearningRecommendations(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.recommend/);
+  });
 });

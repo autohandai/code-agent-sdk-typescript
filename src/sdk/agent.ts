@@ -25,6 +25,8 @@ import type {
   McpSetVscodeToolsResult,
   McpInvokeResponseParams,
   McpInvokeResponseResult,
+  LearnRecommendParams,
+  LearnRecommendResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -766,5 +768,11 @@ export class Agent {
     params: McpInvokeResponseParams
   ): Promise<McpInvokeResponseResult> {
     return this.sdk.respondToMcpInvocation(params);
+  }
+
+  async getLearningRecommendations(
+    params: LearnRecommendParams = {}
+  ): Promise<LearnRecommendResult> {
+    return this.sdk.getLearningRecommendations(params);
   }
 }
