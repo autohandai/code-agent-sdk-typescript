@@ -38,6 +38,8 @@ import type {
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
   BrowserHandoffAttachResult,
+  AutomodeStartParams,
+  AutomodeStartResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -386,6 +388,16 @@ export class RPCClient {
       'autohand.browserHandoff.attachLatest',
       {}
     ) as Promise<BrowserHandoffAttachResult>;
+  }
+
+  /**
+   * Start an autonomous auto-mode session.
+   */
+  async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
+    return this.transport.request(
+      'autohand.automode.start',
+      params
+    ) as Promise<AutomodeStartResult>;
   }
 
   /**

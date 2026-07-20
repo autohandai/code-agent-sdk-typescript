@@ -38,6 +38,8 @@ import type {
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
   BrowserHandoffAttachResult,
+  AutomodeStartParams,
+  AutomodeStartResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1439,6 +1441,14 @@ export class AutohandSDK {
   async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
     await this.ensureStarted();
     return this.client.attachLatestBrowserHandoff();
+  }
+
+  /**
+   * Start an autonomous auto-mode session.
+   */
+  async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
+    await this.ensureStarted();
+    return this.client.startAutomode(params);
   }
 
   // ============================================================================

@@ -1901,6 +1901,22 @@ export interface BrowserHandoffAttachResult {
   messageCount?: number;
 }
 
+export interface AutomodeStartParams {
+  prompt: string;
+  maxIterations?: number;
+  completionPromise?: string;
+  useWorktree?: boolean;
+  checkpointInterval?: number;
+  maxRuntime?: number;
+  maxCost?: number;
+}
+
+export interface AutomodeStartResult {
+  success: boolean;
+  sessionId?: string;
+  error?: string;
+}
+
 export interface GetStateResult {
   status: 'idle' | 'processing' | 'waiting_permission';
   sessionId: string | null;

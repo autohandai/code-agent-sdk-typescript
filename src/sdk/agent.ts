@@ -36,6 +36,8 @@ import type {
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
   BrowserHandoffAttachResult,
+  AutomodeStartParams,
+  AutomodeStartResult,
   InstallSkillParams,
   InstallSkillResult,
   McpListServersResult,
@@ -571,6 +573,10 @@ export class Agent {
 
   async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
     return this.sdk.attachLatestBrowserHandoff();
+  }
+
+  async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
+    return this.sdk.startAutomode(params);
   }
 
   async setPlanMode(enabled: boolean): Promise<void> {

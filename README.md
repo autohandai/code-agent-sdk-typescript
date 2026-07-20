@@ -407,6 +407,19 @@ Attach the newest unexpired handoff when a token is not available.
 const attached = await agent.attachLatestBrowserHandoff();
 ```
 
+#### `startAutomode(params): Promise<AutomodeStartResult>`
+
+Start an autonomous run and return as soon as CLI-3 accepts the session. The
+result reports the auto-mode session ID; completion continues asynchronously.
+
+```typescript
+const started = await agent.startAutomode({
+  prompt: 'Implement and verify the release checklist',
+  maxIterations: 25,
+  useWorktree: true,
+});
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

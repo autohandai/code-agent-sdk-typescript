@@ -118,3 +118,36 @@ describe('session control RPCs', () => {
     await expect(agent.attachLatestBrowserHandoff()).resolves.toEqual(attached);
   });
 });
+
+describe('auto-mode control RPCs', () => {
+  it('starts auto-mode with the complete CLI parameter contract', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const started = { success: true, sessionId: 'automode-session' };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return started;
+    };
+    const params = {
+      prompt: 'Ship the release',
+      maxIterations: 25,
+      completionPromise: 'SHIPPED',
+      useWorktree: false,
+      checkpointInterval: 3,
+      maxRuntime: 45,
+      maxCost: 8.5,
+    };
+
+    await expect(client.startAutomode(params)).resolves.toEqual(started);
+    expect(calls).toEqual([{
+      method: 'autohand.automode.start',
+      params,
+    }]);
+
+    const sdk = {
+      startAutomode: async () => started,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.startAutomode(params)).resolves.toEqual(started);
+  });
+});
