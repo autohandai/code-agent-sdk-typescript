@@ -569,6 +569,10 @@ export class Agent {
     return this.sdk.attachBrowserHandoff(params);
   }
 
+  async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
+    return this.sdk.attachLatestBrowserHandoff();
+  }
+
   async setPlanMode(enabled: boolean): Promise<void> {
     await this.sdk.setPlanMode(enabled);
   }

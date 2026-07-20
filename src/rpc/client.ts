@@ -379,6 +379,16 @@ export class RPCClient {
   }
 
   /**
+   * Attach the newest unexpired browser handoff.
+   */
+  async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
+    return this.transport.request(
+      'autohand.browserHandoff.attachLatest',
+      {}
+    ) as Promise<BrowserHandoffAttachResult>;
+  }
+
+  /**
    * Respond to a permission request
    * 
    * @param params - Permission response parameters

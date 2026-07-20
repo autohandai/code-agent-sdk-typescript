@@ -1433,6 +1433,14 @@ export class AutohandSDK {
     return this.client.attachBrowserHandoff(params);
   }
 
+  /**
+   * Attach the newest unexpired browser handoff.
+   */
+  async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
+    await this.ensureStarted();
+    return this.client.attachLatestBrowserHandoff();
+  }
+
   // ============================================================================
   // Permission Handling
   // ============================================================================

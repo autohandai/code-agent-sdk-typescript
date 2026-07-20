@@ -90,4 +90,31 @@ describe('session control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.attachBrowserHandoff(params)).resolves.toEqual(attached);
   });
+
+  it('attaches the latest browser handoff through every public layer', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const attached = {
+      success: true,
+      sessionId: 'session-latest',
+      workspaceRoot: '/workspace',
+      messageCount: 8,
+    };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return attached;
+    };
+
+    await expect(client.attachLatestBrowserHandoff()).resolves.toEqual(attached);
+    expect(calls).toEqual([{
+      method: 'autohand.browserHandoff.attachLatest',
+      params: {},
+    }]);
+
+    const sdk = {
+      attachLatestBrowserHandoff: async () => attached,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.attachLatestBrowserHandoff()).resolves.toEqual(attached);
+  });
 });

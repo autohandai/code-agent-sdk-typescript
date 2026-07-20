@@ -399,6 +399,14 @@ Consume a one-time handoff token and attach the referenced CLI session.
 const attached = await agent.attachBrowserHandoff({ token: handoff.token });
 ```
 
+#### `attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult>`
+
+Attach the newest unexpired handoff when a token is not available.
+
+```typescript
+const attached = await agent.attachLatestBrowserHandoff();
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.
