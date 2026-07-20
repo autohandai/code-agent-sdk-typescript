@@ -64,4 +64,9 @@ describe('SDK release workflow', () => {
     expect(version103).toContain('# Autohand Agent SDK v1.0.3');
     expect(version103).toContain('autoresearch ledger');
   });
+
+  it('declares the startup benchmark in the published file manifest', () => {
+    const packageJson = JSON.parse(readRepositoryFile('package.json')) as { files?: string[] };
+    expect(packageJson.files).toContain('scripts/benchmark-startup.mjs');
+  });
 });

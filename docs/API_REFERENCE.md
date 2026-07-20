@@ -530,7 +530,8 @@ Drive a newly started loop by passing its returned instruction to
 
 #### `sdk.prompt(params: PromptParams): Promise<void>`
 
-Send a prompt to the agent (non-streaming).
+Send a prompt to the agent without exposing streamed events. The promise resolves
+after the terminal turn event, not the earlier RPC acceptance acknowledgement.
 
 ```typescript
 await sdk.prompt({
@@ -766,7 +767,31 @@ for (const agent of agents) {
 
 ---
 
-#### `sdk.mcpServerStatus(): Promise<unknown[]>`
+#### `sdk.getSkillsRegistry(params?: GetSkillsRegistryParams): Promise<GetSkillsRegistryResult>`
+
+List community skills and registry categories. Pass `{ forceRefresh: true }` to bypass the CLI cache.
+
+#### `sdk.installSkill(params: InstallSkillParams): Promise<InstallSkillResult>`
+
+Install a registry skill with `{ skillName, scope: 'user' | 'project', force? }`.
+
+---
+
+#### `sdk.listMcpServers(): Promise<McpListServersResult>`
+
+Return every known MCP server with its `name`, connection `status`, and `toolCount`.
+
+#### `sdk.listMcpTools(params?: McpListToolsParams): Promise<McpListToolsResult>`
+
+Return MCP tool descriptors. Pass `{ serverName }` to filter the result.
+
+#### `sdk.getMcpServerConfigs(): Promise<McpGetServerConfigsResult>`
+
+Return persisted MCP transport configuration, including command, URL, environment, headers, and auto-connect state.
+
+---
+
+#### `sdk.mcpServerStatus(): Promise<McpServerSummary[]>`
 
 Get the current status of all configured MCP servers.
 
@@ -775,7 +800,9 @@ const status = await sdk.mcpServerStatus();
 console.log('MCP servers:', status);
 ```
 
-**Returns:** `Promise<unknown[]>` - Array of MCP server status objects
+This compatibility alias returns `(await sdk.listMcpServers()).servers`.
+
+**Returns:** `Promise<McpServerSummary[]>` - Array of typed MCP server summaries
 
 ---
 
@@ -1126,6 +1153,18 @@ Reload plugins.
 Get account info.
 
 **Returns:** Account information
+
+---
+
+#### Skills registry and MCP inspection
+
+- `client.getSkillsRegistry(params?)` calls `autohand.getSkillsRegistry`.
+- `client.installSkill(params)` calls `autohand.installSkill`.
+- `client.listMcpServers()` calls `autohand.mcp.listServers`.
+- `client.listMcpTools(params?)` calls `autohand.mcp.listTools`.
+- `client.getMcpServerConfigs()` calls `autohand.mcp.getServerConfigs`.
+
+All five return the typed result contracts exported by the package.
 
 ---
 

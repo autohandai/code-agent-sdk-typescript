@@ -26,6 +26,125 @@ async function nextEvent(client: RPCClient): Promise<SDKEvent> {
 }
 
 describe('RPC Client Notification Handling', () => {
+  it('broadcasts each notification to every active subscriber', async () => {
+    const client = new RPCClient({ debug: false });
+    const first = client.events();
+    const second = client.events();
+    const firstEvent = first.next();
+    const secondEvent = second.next();
+
+    getTransport(client).handleLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'autohand.messageUpdate',
+      params: {
+        messageId: 'msg_broadcast',
+        delta: 'shared',
+        timestamp: '2026-07-20T00:00:00.000Z',
+      },
+    }));
+
+    expect(await firstEvent).toEqual({
+      done: false,
+      value: {
+        type: 'message_update',
+        messageId: 'msg_broadcast',
+        delta: 'shared',
+        timestamp: '2026-07-20T00:00:00.000Z',
+      },
+    });
+    expect(await secondEvent).toEqual({
+      done: false,
+      value: {
+        type: 'message_update',
+        messageId: 'msg_broadcast',
+        delta: 'shared',
+        timestamp: '2026-07-20T00:00:00.000Z',
+      },
+    });
+    await first.return(undefined);
+    await second.return(undefined);
+  });
+
+  it('closes blocked event iterators when the client stops', async () => {
+    const client = new RPCClient({ debug: false });
+    const events = client.events();
+    const pending = events.next();
+
+    await client.stop();
+
+    expect(await pending).toEqual({ done: true, value: undefined });
+  });
+
+  it('bounds the queue of a slow active event subscriber', async () => {
+    const client = new RPCClient({ debug: false });
+    const events = client.events();
+    const first = events.next();
+
+    const notification = (index: number): void => getTransport(client).handleLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'autohand.messageUpdate',
+      params: {
+        messageId: `msg_${index}`,
+        delta: String(index),
+        timestamp: '2026-07-20T00:00:00.000Z',
+      },
+    }));
+
+    notification(0);
+    await first;
+    for (let index = 1; index <= 1_100; index += 1) notification(index);
+
+    const next = await events.next();
+    expect(next.done).toBe(false);
+    if (next.done === false && next.value.type === 'message_update') {
+      expect(next.value.delta).toBe('77');
+    }
+    await events.return(undefined);
+  });
+
+  it('lets prompt-owned subscribers ignore stale backlog without removing public history', async () => {
+    const client = new RPCClient({ debug: false });
+    getTransport(client).handleLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'autohand.turnEnd',
+      params: {
+        turnId: 'stale-turn',
+        timestamp: '2026-07-20T00:00:00.000Z',
+      },
+    }));
+
+    const freshEvents = client.events(undefined, false);
+    const freshResult = freshEvents.next();
+    getTransport(client).handleLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'autohand.messageUpdate',
+      params: {
+        messageId: 'current',
+        delta: 'fresh',
+        timestamp: '2026-07-20T00:00:01.000Z',
+      },
+    }));
+
+    expect(await freshResult).toEqual({
+      done: false,
+      value: {
+        type: 'message_update',
+        messageId: 'current',
+        delta: 'fresh',
+        timestamp: '2026-07-20T00:00:01.000Z',
+      },
+    });
+    await freshEvents.return(undefined);
+
+    const historicalEvents = client.events();
+    const historical = await historicalEvents.next();
+    expect(historical.done).toBe(false);
+    if (historical.done === false) {
+      expect(historical.value.type).toBe('agent_end');
+    }
+    await historicalEvents.return(undefined);
+  });
+
   it('maps messageEnd notifications to message_end events', async () => {
     const client = new RPCClient({ debug: false });
 
@@ -63,8 +182,14 @@ describe('RPC Client Notification Handling', () => {
       },
     }));
 
-    const first = await nextEvent(client);
-    const second = await nextEvent(client);
+    const events = client.events();
+    const firstResult = await events.next();
+    const secondResult = await events.next();
+    if (firstResult.done === true || secondResult.done === true) {
+      throw new Error('Expected two SDK events');
+    }
+    const first = firstResult.value;
+    const second = secondResult.value;
 
     expect(first.type).toBe('agent_end');
     if (first.type !== 'agent_end') {
@@ -80,6 +205,7 @@ describe('RPC Client Notification Handling', () => {
       durationMs: 1250,
       contextPercent: 12,
     });
+    await events.return(undefined);
   });
 
   it('maps autoresearch lifecycle notifications to typed SDK events', async () => {

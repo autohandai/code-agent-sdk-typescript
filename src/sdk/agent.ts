@@ -29,6 +29,14 @@ import type {
   AutoresearchPinResult,
   AutoresearchPruneParams,
   AutoresearchPruneResult,
+  GetSkillsRegistryParams,
+  GetSkillsRegistryResult,
+  InstallSkillParams,
+  InstallSkillResult,
+  McpListServersResult,
+  McpListToolsParams,
+  McpListToolsResult,
+  McpGetServerConfigsResult,
 } from '../types/index.js';
 
 export type AgentInput = string | PromptParams;
@@ -586,6 +594,28 @@ export class Agent {
 
   async listGoalTemplates(): Promise<GoalTemplatesResult> {
     return this.sdk.listGoalTemplates();
+  }
+
+  async getSkillsRegistry(
+    params: GetSkillsRegistryParams = {}
+  ): Promise<GetSkillsRegistryResult> {
+    return this.sdk.getSkillsRegistry(params);
+  }
+
+  async installSkill(params: InstallSkillParams): Promise<InstallSkillResult> {
+    return this.sdk.installSkill(params);
+  }
+
+  async listMcpServers(): Promise<McpListServersResult> {
+    return this.sdk.listMcpServers();
+  }
+
+  async listMcpTools(params: McpListToolsParams = {}): Promise<McpListToolsResult> {
+    return this.sdk.listMcpTools(params);
+  }
+
+  async getMcpServerConfigs(): Promise<McpGetServerConfigsResult> {
+    return this.sdk.getMcpServerConfigs();
   }
 
   async allowPermission(requestId: string, scope?: PermissionDecisionScope): Promise<void> {

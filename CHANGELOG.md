@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- Added typed skill registry discovery and installation APIs.
+- Added typed MCP server, tool, and persisted-configuration inspection APIs.
+- Added a reproducible p95 startup benchmark with a strict 50 ms budget.
+
+### Fixed
+
+- Removed the 500 ms startup delay and made process startup, shutdown, and retries race-safe.
+- Reject pending requests immediately on child exit, write failure, timeout, or stdout closure.
+- Forward the documented generic `env` option and retain bounded stderr diagnostics.
+- Roll back partially initialized SDK sessions instead of leaving a poisoned live process.
+- Broadcast events to independent bounded subscribers, close iterators on shutdown, and prevent stale prompt-stream reads from consuming later notifications.
+- Serialize prompt operations without blocking control RPCs, abort abandoned streams before admitting the next prompt, and fail immediately if stdout closes while the child remains alive.
+- Reap TERM-ignoring children after stdout EOF, including when their final JSON frame has no newline, and ship the startup benchmark in the npm package that references it.
+- Wait for terminal work in non-streaming prompts and isolate each prompt from stale pre-request event backlog.
+- Coordinate `stop()` with pre-spawn startup work so deferred binary detection or skill copying cannot create an orphan child after shutdown returns.
+- Make every caller of a coalesced start observe the same spawn failure, and drain all complete buffered JSON frames before applying stdout-EOF termination.
+- Reject malformed matching JSON-RPC result/error envelopes explicitly instead of clearing their timeout and orphaning the caller.
+- Make SDK `start()` wait for an in-flight `stop()` and coalesce every post-stop restart caller onto the fresh session.
+- Refuse to commit SDK startup if the CLI terminates immediately after acknowledging its final configuration RPC.
+
 ## v1.0.3 - 2026-07-16
 
 > Stable release.

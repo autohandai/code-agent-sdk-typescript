@@ -21,7 +21,10 @@
 export class LineReader {
   private buffer = '';
   private lineQueue: string[] = [];
-  private resolvers: Array<(line: string) => void> = [];
+  private resolvers: Array<{
+    resolve: (line: string) => void;
+    reject: (error: Error) => void;
+  }> = [];
   private closed = false;
 
   /**
@@ -70,7 +73,7 @@ export class LineReader {
       this.deliverLine(this.buffer);
     }
     this.buffer = '';
-    this.closed = true;
+    this.close();
   }
 
   /**
@@ -81,7 +84,7 @@ export class LineReader {
    * @private
    */
   private handleClose(): void {
-    this.closed = true;
+    this.close();
   }
 
   /**
@@ -92,12 +95,12 @@ export class LineReader {
    */
   private deliverLine(line: string): void {
     if (this.resolvers.length > 0) {
-      const resolver = this.resolvers.shift();
-      if (resolver === undefined) {
+      const waiter = this.resolvers.shift();
+      if (waiter === undefined) {
         this.lineQueue.push(line);
         return;
       }
-      resolver(line);
+      waiter.resolve(line);
     } else {
       this.lineQueue.push(line);
     }
@@ -125,9 +128,19 @@ export class LineReader {
       throw new Error('Stream closed');
     }
 
-    return new Promise((resolve) => {
-      this.resolvers.push(resolve);
+    return new Promise((resolve, reject) => {
+      this.resolvers.push({ resolve, reject });
     });
+  }
+
+  /** Close the reader and reject callers currently waiting for another line. */
+  close(error: Error = new Error('Stream closed')): void {
+    if (this.closed) return;
+    this.closed = true;
+    const waiters = this.resolvers.splice(0);
+    for (const waiter of waiters) {
+      waiter.reject(error);
+    }
   }
 
   /**

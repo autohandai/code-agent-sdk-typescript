@@ -27,6 +27,51 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
+// ============================================================================
+// Skills Registry RPC Types
+// ============================================================================
+
+/** Community skill metadata returned by the CLI registry. */
+export interface RpcCommunitySkill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags?: string[];
+  rating?: number;
+  downloadCount?: number;
+  isFeatured?: boolean;
+  isCurated?: boolean;
+}
+
+/** Options for refreshing the community skills registry. */
+export interface GetSkillsRegistryParams {
+  forceRefresh?: boolean;
+}
+
+/** Result returned by `autohand.getSkillsRegistry`. */
+export interface GetSkillsRegistryResult {
+  success: boolean;
+  skills: RpcCommunitySkill[];
+  categories: Array<{ name: string; count: number }>;
+  error?: string;
+}
+
+/** Options for installing a community skill. */
+export interface InstallSkillParams {
+  skillName: string;
+  scope: 'user' | 'project';
+  force?: boolean;
+}
+
+/** Result returned by `autohand.installSkill`. */
+export interface InstallSkillResult {
+  success: boolean;
+  skillName?: string;
+  path?: string;
+  error?: string;
+}
+
 export type JsonRpcId = string | number | null;
 export type JsonRpcParams = Record<string, unknown> | unknown[];
 
@@ -2118,6 +2163,49 @@ export interface ErrorEvent {
 // ============================================================================
 // Additional Types for Advanced Features
 // ============================================================================
+
+/** Connection summary returned by `autohand.mcp.listServers`. */
+export interface McpServerSummary {
+  name: string;
+  status: string;
+  toolCount: number;
+}
+
+export interface McpListServersResult {
+  servers: McpServerSummary[];
+}
+
+/** Optional server filter for `autohand.mcp.listTools`. */
+export interface McpListToolsParams {
+  serverName?: string;
+}
+
+/** MCP tool descriptor returned by the CLI. */
+export interface McpToolSummary {
+  name: string;
+  description: string;
+  serverName: string;
+}
+
+export interface McpListToolsResult {
+  tools: McpToolSummary[];
+}
+
+/** Persisted MCP configuration returned by the CLI. */
+export interface McpServerConfigEntry {
+  name: string;
+  transport: 'stdio' | 'sse' | 'http';
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  autoConnect?: boolean;
+}
+
+export interface McpGetServerConfigsResult {
+  configs: McpServerConfigEntry[];
+}
 
 export interface McpServerConfig {
   transport: 'stdio' | 'sse' | 'http' | 'sdk';

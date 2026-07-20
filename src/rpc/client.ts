@@ -73,6 +73,14 @@ import type {
   AutoresearchPruneResult,
   AutoresearchLifecycleEvent,
   AutoresearchOperationEvent,
+  GetSkillsRegistryParams,
+  GetSkillsRegistryResult,
+  InstallSkillParams,
+  InstallSkillResult,
+  McpListServersResult,
+  McpListToolsParams,
+  McpListToolsResult,
+  McpGetServerConfigsResult,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 
@@ -128,10 +136,21 @@ function toGoalRpcParams(
   return rpcParams;
 }
 
+type EventWaiter = (result: IteratorResult<SDKEvent>) => void;
+
+interface EventSubscriber {
+  queue: SDKEvent[];
+  waiters: EventWaiter[];
+  closed: boolean;
+}
+
+const MAX_EVENT_BACKLOG = 1_024;
+
 export class RPCClient {
   private transport: Transport;
-  private eventQueue: SDKEvent[] = [];
-  private eventResolvers: Array<(event: SDKEvent) => void> = [];
+  private eventBacklog: SDKEvent[] = [];
+  private eventSubscribers = new Set<EventSubscriber>();
+  private eventStreamsClosed = false;
 
   /**
    * Create a new RPCClient instance
@@ -250,11 +269,13 @@ export class RPCClient {
     if (config.baseUrl !== undefined) transportOptions.baseUrl = config.baseUrl;
     if (config.autohandAIPlan !== undefined) transportOptions.autohandAIPlan = config.autohandAIPlan;
     if (config.port !== undefined) transportOptions.port = config.port;
+    if (config.env !== undefined) transportOptions.env = config.env;
     if (config.envVars !== undefined) transportOptions.envVars = config.envVars;
     if (config.hooks?.enabled !== undefined) transportOptions.hooksEnabled = config.hooks.enabled;
     if (config.hooks?.hooks !== undefined) transportOptions.hooksDefinitions = config.hooks.hooks;
 
     this.transport = new Transport(transportOptions);
+    this.transport.onTermination(() => this.closeEventStreams());
 
     // Register notification handlers
     this.setupNotificationHandlers();
@@ -267,13 +288,18 @@ export class RPCClient {
    */
   async start(): Promise<void> {
     await this.transport.start();
+    this.eventStreamsClosed = false;
   }
 
   /**
    * Stop the client and close the transport
    */
   async stop(): Promise<void> {
-    await this.transport.stop();
+    try {
+      await this.transport.stop();
+    } finally {
+      this.closeEventStreams();
+    }
   }
 
   /**
@@ -492,6 +518,48 @@ export class RPCClient {
     return this.transport.request('autohand.getAccountInfo', {});
   }
 
+  /** Return the community skills registry, optionally bypassing the cache. */
+  async getSkillsRegistry(
+    params: GetSkillsRegistryParams = {}
+  ): Promise<GetSkillsRegistryResult> {
+    return this.transport.request(
+      'autohand.getSkillsRegistry',
+      params
+    ) as Promise<GetSkillsRegistryResult>;
+  }
+
+  /** Install a community skill into user or project scope. */
+  async installSkill(params: InstallSkillParams): Promise<InstallSkillResult> {
+    return this.transport.request(
+      'autohand.installSkill',
+      params
+    ) as Promise<InstallSkillResult>;
+  }
+
+  /** List MCP servers and their live connection status. */
+  async listMcpServers(): Promise<McpListServersResult> {
+    return this.transport.request(
+      'autohand.mcp.listServers',
+      {}
+    ) as Promise<McpListServersResult>;
+  }
+
+  /** List MCP tools, optionally restricted to one server. */
+  async listMcpTools(params: McpListToolsParams = {}): Promise<McpListToolsResult> {
+    return this.transport.request(
+      'autohand.mcp.listTools',
+      params
+    ) as Promise<McpListToolsResult>;
+  }
+
+  /** Return the persisted MCP server configurations. */
+  async getMcpServerConfigs(): Promise<McpGetServerConfigsResult> {
+    return this.transport.request(
+      'autohand.mcp.getServerConfigs',
+      {}
+    ) as Promise<McpGetServerConfigsResult>;
+  }
+
   /**
    * Toggle MCP server
    * 
@@ -591,22 +659,43 @@ export class RPCClient {
    * 
    * @returns Async generator yielding SDK events
    */
-  async *events(): AsyncGenerator<SDKEvent> {
-    while (true) {
-      // Deliver queued events first
-      while (this.eventQueue.length > 0) {
-        const event = this.eventQueue.shift();
-        if (event !== undefined) {
-          yield event;
+  async *events(
+    signal?: AbortSignal,
+    includeBacklog: boolean = true
+  ): AsyncGenerator<SDKEvent> {
+    if (this.eventStreamsClosed || signal?.aborted === true) return;
+
+    const subscriber: EventSubscriber = { queue: [], waiters: [], closed: false };
+    if (includeBacklog && this.eventSubscribers.size === 0 && this.eventBacklog.length > 0) {
+      subscriber.queue.push(...this.eventBacklog.splice(0));
+    }
+    this.eventSubscribers.add(subscriber);
+
+    const abort = (): void => this.closeEventSubscriber(subscriber);
+    signal?.addEventListener('abort', abort, { once: true });
+
+    try {
+      while (!subscriber.closed) {
+        if (subscriber.queue.length > 0) {
+          const event = subscriber.queue.shift();
+          if (event !== undefined) yield event;
+          continue;
         }
+
+        const result = await new Promise<IteratorResult<SDKEvent>>((resolve) => {
+          if (subscriber.closed) {
+            resolve({ done: true, value: undefined });
+            return;
+          }
+          subscriber.waiters.push(resolve);
+        });
+
+        if (result.done === true) return;
+        yield result.value;
       }
-
-      // Wait for next event
-      const event = await new Promise<SDKEvent>((resolve) => {
-        this.eventResolvers.push(resolve);
-      });
-
-      yield event;
+    } finally {
+      signal?.removeEventListener('abort', abort);
+      this.closeEventSubscriber(subscriber);
     }
   }
 
@@ -767,13 +856,44 @@ export class RPCClient {
    * @private
    */
   private queueEvent(event: SDKEvent): void {
-    if (this.eventResolvers.length > 0) {
-      const resolver = this.eventResolvers.shift();
-      if (resolver) {
-        resolver(event);
+    if (this.eventStreamsClosed) return;
+
+    if (this.eventSubscribers.size === 0) {
+      this.eventBacklog.push(event);
+      if (this.eventBacklog.length > MAX_EVENT_BACKLOG) {
+        this.eventBacklog.shift();
       }
-    } else {
-      this.eventQueue.push(event);
+      return;
+    }
+
+    for (const subscriber of this.eventSubscribers) {
+      const waiter = subscriber.waiters.shift();
+      if (waiter !== undefined) {
+        waiter({ done: false, value: event });
+      } else {
+        subscriber.queue.push(event);
+        if (subscriber.queue.length > MAX_EVENT_BACKLOG) {
+          subscriber.queue.shift();
+        }
+      }
+    }
+  }
+
+  private closeEventSubscriber(subscriber: EventSubscriber): void {
+    if (subscriber.closed) return;
+    subscriber.closed = true;
+    subscriber.queue.length = 0;
+    this.eventSubscribers.delete(subscriber);
+    for (const waiter of subscriber.waiters.splice(0)) {
+      waiter({ done: true, value: undefined });
+    }
+  }
+
+  private closeEventStreams(): void {
+    this.eventStreamsClosed = true;
+    this.eventBacklog.length = 0;
+    for (const subscriber of [...this.eventSubscribers]) {
+      this.closeEventSubscriber(subscriber);
     }
   }
 

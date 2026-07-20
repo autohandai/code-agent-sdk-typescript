@@ -77,6 +77,14 @@ import type {
   AutoresearchPinResult,
   AutoresearchPruneParams,
   AutoresearchPruneResult,
+  GetSkillsRegistryParams,
+  GetSkillsRegistryResult,
+  InstallSkillParams,
+  InstallSkillResult,
+  McpListServersResult,
+  McpListToolsParams,
+  McpListToolsResult,
+  McpGetServerConfigsResult,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
 
@@ -198,8 +206,12 @@ function requiresStartupPermissionModeRpc(
 }
 
 export class AutohandSDK {
+  private static readonly PROMPT_CLEANUP_TIMEOUT_MS = 2_000;
   private client: RPCClient;
   private started: boolean = false;
+  private startPromise: Promise<void> | null = null;
+  private stopPromise: Promise<void> | null = null;
+  private promptTail: Promise<void> = Promise.resolve();
   private _tools: Tool[] = [];
   private _skills: SkillReference[] = [];
 
@@ -388,9 +400,23 @@ export class AutohandSDK {
    * ```
    */
   async start(): Promise<void> {
-    if (this.started) {
-      return;
+    if (this.stopPromise !== null) await this.stopPromise;
+    if (this.startPromise !== null) return this.startPromise;
+    if (this.started && this.client.isConnected()) return;
+
+    const operation = this.startSession();
+    this.startPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.startPromise === operation) {
+        this.startPromise = null;
+      }
     }
+  }
+
+  private async startSession(): Promise<void> {
+    this.started = false;
 
     // If skills were set after construction, update config and rebuild client
     if (this._skills.length > 0) {
@@ -398,21 +424,31 @@ export class AutohandSDK {
       this.client = new RPCClient(this.config);
     }
 
-    await this.client.start();
-    this.started = true;
+    try {
+      await this.client.start();
 
-    if (this.config.features !== undefined) {
-      await this.client.applyFlagSettings({ features: this.config.features });
-    }
+      if (this.config.features !== undefined) {
+        await this.client.applyFlagSettings({ features: this.config.features });
+      }
 
-    const startupPermissionMode = this.config.permissionMode;
-    if (requiresStartupPermissionModeRpc(startupPermissionMode)) {
-      await this.client.setPermissionMode(startupPermissionMode);
-    }
+      const startupPermissionMode = this.config.permissionMode;
+      if (requiresStartupPermissionModeRpc(startupPermissionMode)) {
+        await this.client.setPermissionMode(startupPermissionMode);
+      }
 
-    const shouldEnablePlanMode = this.config.planMode ?? this.config.permissionMode === 'plan';
-    if (shouldEnablePlanMode) {
-      await this.client.setPlanMode(true);
+      const shouldEnablePlanMode = this.config.planMode ?? this.config.permissionMode === 'plan';
+      if (shouldEnablePlanMode) {
+        await this.client.setPlanMode(true);
+      }
+
+      if (!this.client.isConnected()) {
+        throw new Error('CLI process terminated during SDK startup');
+      }
+      this.started = true;
+    } catch (error) {
+      await this.client.stop().catch(() => undefined);
+      this.started = false;
+      throw error;
     }
   }
 
@@ -428,12 +464,29 @@ export class AutohandSDK {
    * ```
    */
   async stop(): Promise<void> {
-    if (!this.started) {
-      return;
-    }
+    if (this.stopPromise !== null) return this.stopPromise;
 
-    await this.client.stop();
-    this.started = false;
+    const operation = this.stopSession();
+    this.stopPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.stopPromise === operation) {
+        this.stopPromise = null;
+      }
+    }
+  }
+
+  private async stopSession(): Promise<void> {
+    if (this.startPromise !== null) {
+      await this.startPromise.catch(() => undefined);
+    }
+    if (!this.started && !this.client.isConnected()) return;
+    try {
+      await this.client.stop();
+    } finally {
+      this.started = false;
+    }
   }
 
   /**
@@ -486,19 +539,14 @@ export class AutohandSDK {
    * ```
    */
   async prompt(params: PromptParams): Promise<void> {
-    await this.ensureStarted();
-
-    // Process AGENTS.md if provided in prompt params
-    let processedParams = params;
-    if (params.agentsMd !== undefined) {
-      const cwd = this.config.cwd ?? process.cwd();
-      const agentsMdData = await processAgentsMdConfig(params.agentsMd, cwd);
-      if (agentsMdData !== undefined) {
-        processedParams = addAgentsMdToPrompt(params, agentsMdData);
-      }
+    const events = this.streamPrompt(params);
+    let event = await events.next();
+    while (event.done !== true) {
+      // The non-streaming API deliberately discards events but waits for the
+      // terminal turn marker. The prompt RPC response only acknowledges that
+      // background work was accepted by the CLI.
+      event = await events.next();
     }
-
-    await this.client.prompt(processedParams);
   }
 
   /**
@@ -537,8 +585,17 @@ export class AutohandSDK {
       }
     }
 
+    const releasePrompt = await this.acquirePrompt();
+    const eventCancellation = new AbortController();
+    // Register before sending the prompt and ignore historical backlog. This
+    // prevents a delayed terminal event from an earlier turn from completing
+    // the new prompt while still preserving backlog behavior for public
+    // `events()` subscribers.
+    const events = this.client.events(eventCancellation.signal, false);
+    let nextEvent = events.next();
     let promptSettled = false;
     let promptError: unknown;
+    let terminalEventSeen = false;
     const promptCompletion = this.client.prompt(processedParams)
       .then(() => {
         promptSettled = true;
@@ -548,41 +605,96 @@ export class AutohandSDK {
         promptError = error;
       });
 
-    const events = this.client.events();
-
-    // Stream events
-    while (true) {
-      if (promptError !== undefined) {
-        throw promptError;
-      }
-
-      const nextEvent = events.next();
-      const result = promptSettled
-        ? { type: 'event' as const, value: await nextEvent }
-        : await Promise.race([
-          nextEvent.then((value) => ({ type: 'event' as const, value })),
-          promptCompletion.then(() => ({ type: 'prompt' as const })),
-        ]);
-
-      if (result.type === 'prompt') {
+    try {
+      // Stream events
+      while (true) {
         if (promptError !== undefined) {
           throw promptError;
         }
-        continue;
-      }
 
-      if (result.value.done === true) {
-        break;
-      }
+        const result = promptSettled
+          ? { type: 'event' as const, value: await nextEvent }
+          : await Promise.race([
+            nextEvent.then((value) => ({ type: 'event' as const, value })),
+            promptCompletion.then(() => ({ type: 'prompt' as const })),
+          ]);
 
-      const event = result.value.value;
-      yield event;
+        if (result.type === 'prompt') {
+          if (promptError !== undefined) {
+            throw promptError;
+          }
+          continue;
+        }
 
-      // Stop streaming when agent ends
-      if (event.type === 'agent_end') {
-        break;
+        if (result.value.done === true) {
+          break;
+        }
+
+        const event = result.value.value;
+        if (event.type === 'agent_end') {
+          terminalEventSeen = true;
+        }
+        yield event;
+
+        // Stop streaming when agent ends
+        if (event.type === 'agent_end') {
+          break;
+        }
+        nextEvent = events.next();
       }
+    } finally {
+      const abandoned = !terminalEventSeen && promptError === undefined;
+      if (abandoned) {
+        await this.settleAbandonedPrompt(events);
+      }
+      await promptCompletion;
+      eventCancellation.abort();
+      void events.return(undefined).catch(() => undefined);
+      releasePrompt();
     }
+    if (promptError !== undefined) {
+      throw promptError;
+    }
+  }
+
+  private async settleAbandonedPrompt(events: AsyncGenerator<SDKEvent>): Promise<void> {
+    const cleanup = (async (): Promise<boolean> => {
+      try {
+        await this.client.abort({});
+      } catch {
+        return false;
+      }
+
+      let terminalEventSeen = false;
+      while (!terminalEventSeen) {
+        const result = await events.next();
+        if (result.done === true) return false;
+        terminalEventSeen = result.value.type === 'agent_end';
+      }
+      return true;
+    })();
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<null>((resolve) => {
+      timeout = setTimeout(resolve, AutohandSDK.PROMPT_CLEANUP_TIMEOUT_MS, null);
+    });
+    const settled = await Promise.race([cleanup, deadline]);
+    if (timeout !== undefined) clearTimeout(timeout);
+    if (settled !== true) {
+      await this.stop().catch(() => undefined);
+      await cleanup.catch(() => false);
+    }
+  }
+
+  private async acquirePrompt(): Promise<() => void> {
+    const previous = this.promptTail;
+    let release = (): void => undefined;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.promptTail = previous.then(() => current);
+    await previous;
+    return release;
   }
 
   async *streamCommand(
@@ -1014,10 +1126,8 @@ export class AutohandSDK {
    * console.log('MCP servers:', status);
    * ```
    */
-  async mcpServerStatus(): Promise<unknown[]> {
-    await this.ensureStarted();
-    // TODO: Implement RPC method to get MCP server status
-    return [];
+  async mcpServerStatus(): Promise<McpListServersResult['servers']> {
+    return (await this.listMcpServers()).servers;
   }
 
   /**
@@ -1081,9 +1191,41 @@ export class AutohandSDK {
     return result as AccountInfo;
   }
 
+  /** Query the CLI community-skill registry. */
+  async getSkillsRegistry(
+    params: GetSkillsRegistryParams = {}
+  ): Promise<GetSkillsRegistryResult> {
+    await this.ensureStarted();
+    return this.client.getSkillsRegistry(params);
+  }
+
+  /** Install a registry skill into the requested scope. */
+  async installSkill(params: InstallSkillParams): Promise<InstallSkillResult> {
+    await this.ensureStarted();
+    return this.client.installSkill(params);
+  }
+
   // ============================================================================
   // MCP Server Management
   // ============================================================================
+
+  /** List configured MCP servers and their current connection state. */
+  async listMcpServers(): Promise<McpListServersResult> {
+    await this.ensureStarted();
+    return this.client.listMcpServers();
+  }
+
+  /** List available MCP tools, optionally filtering by server name. */
+  async listMcpTools(params: McpListToolsParams = {}): Promise<McpListToolsResult> {
+    await this.ensureStarted();
+    return this.client.listMcpTools(params);
+  }
+
+  /** Read the persisted MCP configurations known to the CLI. */
+  async getMcpServerConfigs(): Promise<McpGetServerConfigsResult> {
+    await this.ensureStarted();
+    return this.client.getMcpServerConfigs();
+  }
 
   /**
    * Reconnect an MCP server by name
@@ -1395,7 +1537,7 @@ export class AutohandSDK {
    * ```
    */
   isStarted(): boolean {
-    return this.started;
+    return this.started && this.client.isConnected();
   }
 
   /**
@@ -1795,7 +1937,7 @@ export class AutohandSDK {
    * @private
    */
   private async ensureStarted(): Promise<void> {
-    if (!this.started) {
+    if (!this.started || !this.client.isConnected()) {
       await this.start();
     }
   }

@@ -31,6 +31,13 @@ import { fileURLToPath } from 'url';
 
 const currentDirname = path.dirname(fileURLToPath(import.meta.url));
 
+interface PendingRequest {
+  method: string;
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
+
 /**
  * Configuration options for the Transport layer
  */
@@ -43,6 +50,8 @@ export interface TransportOptions {
   debug?: boolean;
   /** Request timeout in milliseconds */
   timeout?: number;
+  /** Additional environment variables passed to the CLI subprocess */
+  env?: Record<string, string>;
   /** Enable auto-mode for autonomous execution */
   autoMode?: boolean;
   /** Run in unrestricted mode (bypasses certain safety checks) */
@@ -212,10 +221,15 @@ export function buildCliArgs(options: TransportOptions): string[] {
 export class Transport {
   private process: ChildProcess | null = null;
   private lineReader: LineReader | null = null;
-  private requestCallbacks = new Map<number | string, (response: unknown) => void>();
+  private pendingRequests = new Map<number | string, PendingRequest>();
   private notificationCallbacks = new Map<string, (params: unknown) => void>();
+  private terminationCallbacks = new Set<(error: Error) => void>();
   private requestIdCounter = 0;
   private debug: boolean;
+  private startPromise: Promise<void> | null = null;
+  private stopPromise: Promise<void> | null = null;
+  private outputTerminationPromise: Promise<void> | null = null;
+  private stderrLines: string[] = [];
 
   /**
    * Create a new Transport instance
@@ -235,6 +249,23 @@ export class Transport {
    * @throws {Error} If the CLI process fails to start
    */
   async start(): Promise<void> {
+    if (this.outputTerminationPromise !== null) await this.outputTerminationPromise;
+    if (this.stopPromise !== null) await this.stopPromise;
+    if (this.startPromise !== null) return this.startPromise;
+    if (this.isRunning()) return;
+
+    const operation = this.startProcess();
+    this.startPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.startPromise === operation) {
+        this.startPromise = null;
+      }
+    }
+  }
+
+  private async startProcess(): Promise<void> {
     const cliPath = this.options.cliPath ?? await this.detectCLIBinary();
     const cwd = this.options.cwd ?? process.cwd();
 
@@ -252,7 +283,10 @@ export class Transport {
     this.log(`CLI args: ${args.join(' ')}`);
 
     // Build environment variables to forward to CLI subprocess
-    const env: Record<string, string> = { ...process.env } as Record<string, string>;
+    const env: Record<string, string> = {
+      ...process.env,
+      ...this.options.env,
+    } as Record<string, string>;
     // Enable tool output streaming for SDK events
     env.AUTOHAND_STREAM_TOOL_OUTPUT = '1';
     if (this.options.provider === 'autohandai') {
@@ -272,36 +306,80 @@ export class Transport {
       }
     }
 
-    this.process = spawn(cliPath, args, {
+    this.stderrLines = [];
+    const child = spawn(cliPath, args, {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
     });
+    this.process = child;
 
-    this.process.on('error', (error) => {
-      this.log(`Process error: ${error.message}`);
-      throw new Error(`Failed to start CLI: ${error.message}`);
+    child.on('error', (error) => {
+      const failure = new Error(`CLI process error: ${error.message}`);
+      this.log(failure.message);
+      this.handleProcessTermination(child, failure);
     });
 
-    this.process.on('exit', (code, signal) => {
-      this.log(`Process exited: code=${code}, signal=${signal}`);
+    child.on('exit', (code, signal) => {
+      const detail = code !== null ? `code ${code}` : `signal ${signal ?? 'unknown'}`;
+      const stderr = this.getStderrTail();
+      const failure = new Error(
+        `CLI process exited with ${detail}${stderr === '' ? '' : `:\n${stderr}`}`
+      );
+      this.log(failure.message);
+      this.handleProcessTermination(child, failure);
     });
 
     // Setup line reader for stdout
-    const stdout = this.process.stdout;
+    const stdout = child.stdout;
     if (stdout === null) {
+      child.kill('SIGTERM');
+      this.process = null;
       throw new Error('Process stdout not available');
     }
-    this.lineReader = new LineReader(stdout);
-    void this.startReadingResponses();
+    const reader = new LineReader(stdout);
+    this.lineReader = reader;
+    void this.startReadingResponses(child, reader);
 
     // Keep stderr out of the JSON-RPC stdout channel.
-    this.process.stderr?.on('data', (data: Buffer) => {
-      this.log(`STDERR: ${data.toString()}`);
+    child.stderr?.on('data', (data: Buffer | string) => {
+      const text = data.toString();
+      this.stderrLines.push(...text.split(/\r?\n/).filter((line) => line !== ''));
+      this.stderrLines = this.stderrLines.slice(-50);
+      this.log(`STDERR: ${text}`);
     });
 
-    // Wait for process to be ready
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // The spawn event means the subprocess exists and its stdin pipe is ready.
+    // JSON-RPC input may safely be buffered while the CLI finishes initialization.
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = (): void => {
+        child.off('spawn', onSpawn);
+        child.off('error', onError);
+        child.off('exit', onExit);
+      };
+      const onSpawn = (): void => {
+        cleanup();
+        resolve();
+      };
+      const onError = (error: Error): void => {
+        cleanup();
+        reject(new Error(`Failed to start CLI: ${error.message}`));
+      };
+      const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+        cleanup();
+        reject(new Error(
+          `CLI process exited during startup (${code !== null ? `code ${code}` : `signal ${signal ?? 'unknown'}`})`
+        ));
+      };
+
+      child.once('spawn', onSpawn);
+      child.once('error', onError);
+      child.once('exit', onExit);
+    });
+
+    if (this.process !== child || child.exitCode !== null) {
+      throw new Error('CLI process exited before startup completed');
+    }
   }
 
   /**
@@ -310,18 +388,42 @@ export class Transport {
    * Gracefully terminates the CLI process using SIGTERM and waits for exit.
    */
   async stop(): Promise<void> {
-    if (this.process !== null) {
-      const process = this.process;
-      this.log('Stopping CLI process');
-      process.kill('SIGTERM');
-      
-      // Wait for process to exit
-      await new Promise((resolve) => {
-        process.once('exit', resolve);
-      });
+    if (this.stopPromise !== null) return this.stopPromise;
 
-      this.process = null;
-      this.lineReader = null;
+    const operation = this.stopProcess();
+    this.stopPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.stopPromise === operation) {
+        this.stopPromise = null;
+      }
+    }
+  }
+
+  private async stopProcess(): Promise<void> {
+    if (this.outputTerminationPromise !== null) await this.outputTerminationPromise;
+    const starting = this.startPromise;
+    if (starting !== null) {
+      await starting.catch(() => undefined);
+    }
+    const child = this.process;
+    const stopped = new Error('CLI process stopped');
+    this.process = null;
+    this.lineReader?.close(stopped);
+    this.lineReader = null;
+    this.failPendingRequests(stopped);
+
+    if (child === null || child.exitCode !== null) return;
+
+    this.log('Stopping CLI process');
+    child.stdin?.end();
+    child.kill('SIGTERM');
+
+    const exited = await this.waitForExit(child, 1_000);
+    if (!exited && child.exitCode === null) {
+      child.kill('SIGKILL');
+      await this.waitForExit(child, 1_000);
     }
   }
 
@@ -337,7 +439,8 @@ export class Transport {
    * @throws {Error} If the process is not started, request times out, or an error response is received
    */
   async request(method: string, params?: unknown): Promise<unknown> {
-    if (!this.process) {
+    const child = this.process;
+    if (child === null || child.exitCode !== null || child.stdin === null || !child.stdin.writable) {
       throw new Error('CLI process not started');
     }
 
@@ -351,30 +454,27 @@ export class Transport {
 
     this.log(`Sending request: ${method} (id: ${id})`);
 
-    // Create promise for response
+    const serialized = JSON.stringify(request) + '\n';
     const responsePromise = new Promise<unknown>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.requestCallbacks.delete(id);
+        this.pendingRequests.delete(id);
         reject(new Error(`Request timeout: ${method}`));
-      }, this.options.timeout ?? 300000); // 5 minutes default
+      }, this.options.timeout ?? 300000);
 
-      this.requestCallbacks.set(id, (response) => {
-        clearTimeout(timeout);
-        if (this.isErrorResponse(response)) {
-          const errorResponse = response as { error: { message: string } };
-          reject(new Error(errorResponse.error.message));
-        } else {
-          const successResponse = response as { result: unknown };
-          resolve(successResponse.result);
-        }
-      });
+      this.pendingRequests.set(id, { method, resolve, reject, timeout });
     });
 
-    // Send request
-    if (this.process.stdin) {
-      this.process.stdin.write(JSON.stringify(request) + '\n');
-    } else {
-      throw new Error('Process stdin not available');
+    try {
+      child.stdin.write(serialized, (error) => {
+        if (error !== null && error !== undefined) {
+          this.failPendingRequest(id, new Error(`Failed to write RPC request ${method}: ${error.message}`));
+        }
+      });
+    } catch (error) {
+      this.failPendingRequest(
+        id,
+        new Error(`Failed to write RPC request ${method}: ${error instanceof Error ? error.message : String(error)}`)
+      );
     }
 
     return responsePromise;
@@ -404,6 +504,11 @@ export class Transport {
     this.notificationCallbacks.delete(method);
   }
 
+  /** Register a callback that runs when the active CLI process exits unexpectedly. */
+  onTermination(callback: (error: Error) => void): void {
+    this.terminationCallbacks.add(callback);
+  }
+
   /**
    * Start reading responses from stdout
    * 
@@ -412,16 +517,43 @@ export class Transport {
    * 
    * @private
    */
-  private async startReadingResponses(): Promise<void> {
-    if (!this.lineReader) return;
-
+  private async startReadingResponses(child: ChildProcess, reader: LineReader): Promise<void> {
+    let failure = new Error('CLI stdout closed');
     try {
-      while (!this.lineReader.isClosed()) {
-        const line = await this.lineReader.readLine();
+      while (!reader.isClosed() || reader.hasPendingLines()) {
+        const line = await reader.readLine();
         this.handleLine(line);
       }
     } catch (error) {
-      this.log(`Error reading responses: ${error}`);
+      failure = new Error(
+        `CLI stdout closed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    this.log(failure.message);
+    if (this.process === child && this.lineReader === reader) {
+      const operation = this.terminateAfterStdoutClosure(child, failure);
+      this.outputTerminationPromise = operation;
+      try {
+        await operation;
+      } finally {
+        if (this.outputTerminationPromise === operation) {
+          this.outputTerminationPromise = null;
+        }
+      }
+    }
+  }
+
+  private async terminateAfterStdoutClosure(child: ChildProcess, failure: Error): Promise<void> {
+    this.handleProcessTermination(child, failure);
+    child.stdin?.destroy();
+    if (child.exitCode !== null) return;
+
+    child.kill('SIGTERM');
+    const exited = await this.waitForExit(child, 1_000);
+    if (!exited && child.exitCode === null) {
+      child.kill('SIGKILL');
+      await this.waitForExit(child, 1_000);
     }
   }
 
@@ -440,10 +572,35 @@ export class Transport {
 
       if (response.id !== undefined) {
         // This is a response to a request
-        const callback = this.requestCallbacks.get(response.id);
-        if (callback) {
-          this.requestCallbacks.delete(response.id);
-          callback(response);
+        const pending = this.pendingRequests.get(response.id);
+        if (pending !== undefined) {
+          this.pendingRequests.delete(response.id);
+          clearTimeout(pending.timeout);
+          if (this.isErrorResponse(response)) {
+            const error = (response as { error: unknown }).error;
+            if (
+              typeof error === 'object'
+              && error !== null
+              && 'message' in error
+              && typeof error.message === 'string'
+            ) {
+              pending.reject(new Error(error.message));
+            } else {
+              pending.reject(new Error(
+                `Malformed JSON-RPC error response for ${pending.method}`
+              ));
+            }
+          } else if (
+            typeof response === 'object'
+            && response !== null
+            && 'result' in response
+          ) {
+            pending.resolve((response as { result: unknown }).result);
+          } else {
+            pending.reject(new Error(
+              `Malformed JSON-RPC response for ${pending.method}`
+            ));
+          }
         }
       } else {
         // This is a notification
@@ -532,7 +689,55 @@ export class Transport {
    * @returns true if the process exists and has not been killed
    */
   isRunning(): boolean {
-    return this.process !== null && !this.process.killed;
+    return this.process !== null && this.process.exitCode === null;
+  }
+
+  /** Return the last stderr lines emitted by the CLI without mixing them into RPC stdout. */
+  getStderrTail(): string {
+    return this.stderrLines.join('\n');
+  }
+
+  private handleProcessTermination(child: ChildProcess, error: Error): void {
+    if (this.process !== child) return;
+    this.process = null;
+    this.lineReader?.close(error);
+    this.lineReader = null;
+    this.failPendingRequests(error);
+    for (const callback of this.terminationCallbacks) {
+      callback(error);
+    }
+  }
+
+  private failPendingRequest(id: number | string, error: Error): void {
+    const pending = this.pendingRequests.get(id);
+    if (pending === undefined) return;
+    this.pendingRequests.delete(id);
+    clearTimeout(pending.timeout);
+    pending.reject(error);
+  }
+
+  private failPendingRequests(error: Error): void {
+    const requests = [...this.pendingRequests.values()];
+    this.pendingRequests.clear();
+    for (const pending of requests) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error(`${error.message} (pending RPC: ${pending.method})`));
+    }
+  }
+
+  private async waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
+    if (child.exitCode !== null) return true;
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        child.off('exit', onExit);
+        resolve(false);
+      }, timeoutMs);
+      const onExit = (): void => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      child.once('exit', onExit);
+    });
   }
 
   /**

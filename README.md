@@ -19,6 +19,10 @@ The SDK:
 - Communicates via JSON-RPC 2.0 over stdin/stdout
 - Provides an idiomatic TypeScript API
 - Supports streaming events
+- Exposes typed skill-registry and MCP inspection APIs
+- Enforces a reproducible p95 startup budget below 50 ms
+
+See [reliability and startup performance](docs/reliability-and-performance.md) for the benchmark contract and the transport fixes included in the current release.
 
 ## Other Programming Languages (Beta)
 
@@ -382,6 +386,28 @@ Get conversation messages.
 ```typescript
 const messages = await sdk.getMessages({ limit: 10 });
 ```
+
+#### Skill registry and MCP discovery
+
+The low-level SDK and `Agent` expose the same typed discovery operations as the
+current CLI:
+
+```typescript
+const registry = await sdk.getSkillsRegistry({ forceRefresh: true });
+await sdk.installSkill({
+  skillName: 'release-readiness',
+  scope: 'project', // or 'user'
+  force: false,
+});
+
+const servers = await sdk.listMcpServers();
+const tools = await sdk.listMcpTools({ serverName: 'filesystem' });
+const configs = await sdk.getMcpServerConfigs();
+```
+
+Omit `serverName` to list tools across all servers. Registry installation
+returns the CLI's installed path and status; MCP configuration results preserve
+stdio and remote transport fields.
 
 #### `setSystemPrompt(promptOrPath: string): AutohandSDK`
 

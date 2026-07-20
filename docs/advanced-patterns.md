@@ -120,6 +120,22 @@ await sdk.setMcpServers({
 
 await sdk.toggleMcpServer('filesystem', true);
 await sdk.reconnectMcpServer('filesystem');
+
+const servers = await sdk.listMcpServers();
+const tools = await sdk.listMcpTools({ serverName: 'filesystem' });
+const configs = await sdk.getMcpServerConfigs();
+```
+
+## Skill Registry
+
+Inspect and install community skills without leaving the RPC session:
+
+```typescript
+const registry = await sdk.getSkillsRegistry({ forceRefresh: true });
+const install = await sdk.installSkill({
+  skillName: 'release-readiness',
+  scope: 'project',
+});
 ```
 
 ## Agent vs AutohandSDK

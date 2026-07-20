@@ -193,6 +193,8 @@ describe('SDK Configuration Options', () => {
     (sdk as unknown as {
       client: {
         start: () => Promise<void>;
+        stop: () => Promise<void>;
+        isConnected: () => boolean;
         setPermissionMode: (mode: string) => Promise<void>;
         setPlanMode: (enabled: boolean) => Promise<void>;
       };
@@ -200,6 +202,8 @@ describe('SDK Configuration Options', () => {
       start: async () => {
         calls.push('start');
       },
+      stop: async () => undefined,
+      isConnected: () => true,
       setPermissionMode: async (mode) => {
         calls.push(`permission:${mode}`);
       },
@@ -222,6 +226,8 @@ describe('SDK Configuration Options', () => {
     (sdk as unknown as {
       client: {
         start: () => Promise<void>;
+        stop: () => Promise<void>;
+        isConnected: () => boolean;
         setPermissionMode: (mode: string) => Promise<void>;
         setPlanMode: (enabled: boolean) => Promise<void>;
       };
@@ -229,6 +235,8 @@ describe('SDK Configuration Options', () => {
       start: async () => {
         calls.push('start');
       },
+      stop: async () => undefined,
+      isConnected: () => true,
       setPermissionMode: async (mode) => {
         calls.push(`permission:${mode}`);
       },
@@ -251,6 +259,8 @@ describe('SDK Configuration Options', () => {
     (sdk as unknown as {
       client: {
         start: () => Promise<void>;
+        stop: () => Promise<void>;
+        isConnected: () => boolean;
         setPermissionMode: (mode: string) => Promise<void>;
         setPlanMode: (enabled: boolean) => Promise<void>;
       };
@@ -258,6 +268,8 @@ describe('SDK Configuration Options', () => {
       start: async () => {
         calls.push('start');
       },
+      stop: async () => undefined,
+      isConnected: () => true,
       setPermissionMode: async (mode) => {
         calls.push(`permission:${mode}`);
       },

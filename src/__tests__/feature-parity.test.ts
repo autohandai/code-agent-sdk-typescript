@@ -64,6 +64,32 @@ describe('CLI feature parity', () => {
     ]);
   });
 
+  it('routes skill discovery and MCP inspection through current CLI RPC methods', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return { success: true, skills: [], categories: [], servers: [], tools: [], configs: [] };
+    };
+
+    await client.getSkillsRegistry({ forceRefresh: true });
+    await client.installSkill({ skillName: 'release-readiness', scope: 'project', force: true });
+    await client.listMcpServers();
+    await client.listMcpTools({ serverName: 'filesystem' });
+    await client.getMcpServerConfigs();
+
+    expect(calls).toEqual([
+      { method: 'autohand.getSkillsRegistry', params: { forceRefresh: true } },
+      {
+        method: 'autohand.installSkill',
+        params: { skillName: 'release-readiness', scope: 'project', force: true },
+      },
+      { method: 'autohand.mcp.listServers', params: {} },
+      { method: 'autohand.mcp.listTools', params: { serverName: 'filesystem' } },
+      { method: 'autohand.mcp.getServerConfigs', params: {} },
+    ]);
+  });
+
   it('routes autoresearch lifecycle operations through typed RPC methods', async () => {
     const client = new RPCClient();
     const calls: Array<{ method: string; params?: unknown }> = [];
@@ -220,8 +246,9 @@ describe('CLI feature parity', () => {
     const sdk = new AutohandSDK();
     (sdk as unknown as { started: boolean }).started = true;
     (sdk as unknown as {
-      client: { getSupportedCommands(): Promise<unknown> };
+      client: { isConnected(): boolean; getSupportedCommands(): Promise<unknown> };
     }).client = {
+      isConnected: () => true,
       getSupportedCommands: async () => ({
         commands: ['/deep-research', '/autoresearch', '/goal'],
       }),
@@ -295,12 +322,16 @@ describe('CLI feature parity', () => {
     (sdk as unknown as {
       client: {
         start(): Promise<void>;
+        stop(): Promise<void>;
+        isConnected(): boolean;
         applyFlagSettings(settings: Record<string, unknown>): Promise<unknown>;
       };
     }).client = {
       start: async () => {
         calls.push('start');
       },
+      stop: async () => undefined,
+      isConnected: () => true,
       applyFlagSettings: async (settings) => {
         calls.push(`flags:${JSON.stringify(settings)}`);
         return { success: true };
@@ -313,6 +344,44 @@ describe('CLI feature parity', () => {
       'start',
       'flags:{"features":{"slashGoal":true}}',
     ]);
+  });
+
+  it('rolls back failed startup initialization and allows retry', async () => {
+    const sdk = new AutohandSDK({ features: { slashGoal: true } });
+    let connected = false;
+    let attempts = 0;
+    let stops = 0;
+    (sdk as unknown as {
+      client: {
+        start(): Promise<void>;
+        stop(): Promise<void>;
+        isConnected(): boolean;
+        applyFlagSettings(settings: Record<string, unknown>): Promise<unknown>;
+      };
+    }).client = {
+      start: async () => {
+        connected = true;
+      },
+      stop: async () => {
+        stops += 1;
+        connected = false;
+      },
+      isConnected: () => connected,
+      applyFlagSettings: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('feature initialization failed');
+        return { success: true };
+      },
+    };
+
+    await expect(sdk.start()).rejects.toThrow('feature initialization failed');
+    expect(sdk.isStarted()).toBe(false);
+    expect(stops).toBe(1);
+
+    await sdk.start();
+    expect(sdk.isStarted()).toBe(true);
+    expect(attempts).toBe(2);
+    await sdk.stop();
   });
 
   it('accepts the current provider identifiers', () => {
