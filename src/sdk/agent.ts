@@ -23,6 +23,8 @@ import type {
   YoloSetResult,
   McpSetVscodeToolsParams,
   McpSetVscodeToolsResult,
+  McpInvokeResponseParams,
+  McpInvokeResponseResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -758,5 +760,11 @@ export class Agent {
     params: McpSetVscodeToolsParams
   ): Promise<McpSetVscodeToolsResult> {
     return this.sdk.setVscodeMcpTools(params);
+  }
+
+  async respondToMcpInvocation(
+    params: McpInvokeResponseParams
+  ): Promise<McpInvokeResponseResult> {
+    return this.sdk.respondToMcpInvocation(params);
   }
 }

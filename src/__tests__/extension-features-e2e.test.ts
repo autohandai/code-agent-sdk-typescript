@@ -395,4 +395,28 @@ describe('extension RPC features', () => {
       sdk.setVscodeMcpTools(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.mcp\.setVscodeTools/);
   });
+
+  it('sends an MCP invocation response through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.mcp.invokeResponse',
+      params: { requestId: 'mcp-1', success: true, result: '{"matches":3}' },
+      result: { success: true },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.respondToMcpInvocation(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed MCP invocation response acknowledgement', async () => {
+    const fixture = {
+      method: 'autohand.mcp.invokeResponse',
+      params: { requestId: 'mcp-1', success: false, error: 'Tool failed' },
+      result: { success: 'true' },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.respondToMcpInvocation(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.mcp\.invokeResponse/);
+  });
 });

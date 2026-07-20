@@ -2001,6 +2001,17 @@ export interface McpSetVscodeToolsResult {
   success: boolean;
 }
 
+export interface McpInvokeResponseParams {
+  requestId: string;
+  success: boolean;
+  result?: string;
+  error?: string;
+}
+
+export interface McpInvokeResponseResult {
+  success: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

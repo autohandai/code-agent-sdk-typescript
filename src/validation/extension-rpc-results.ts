@@ -8,6 +8,7 @@ import type {
   SessionAttachResult,
   YoloSetResult,
   McpSetVscodeToolsResult,
+  McpInvokeResponseResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -246,6 +247,15 @@ function mcpSetVscodeToolsResult(
   return { success: boolean(record.success, method, `${path}.success`) };
 }
 
+function mcpInvokeResponseResult(
+  value: unknown,
+  method: string,
+  path: string
+): McpInvokeResponseResult {
+  const record = object(value, method, path);
+  return { success: boolean(record.success, method, `${path}.success`) };
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -257,6 +267,7 @@ interface ExtensionRpcResultMap {
   'autohand.yoloSet': YoloSetResult;
   'autohand.yolo.set': YoloSetResult;
   'autohand.mcp.setVscodeTools': McpSetVscodeToolsResult;
+  'autohand.mcp.invokeResponse': McpInvokeResponseResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -284,6 +295,8 @@ const validators: {
     yoloSetResult(value, 'autohand.yolo.set', path),
   'autohand.mcp.setVscodeTools': (value, path) =>
     mcpSetVscodeToolsResult(value, 'autohand.mcp.setVscodeTools', path),
+  'autohand.mcp.invokeResponse': (value, path) =>
+    mcpInvokeResponseResult(value, 'autohand.mcp.invokeResponse', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

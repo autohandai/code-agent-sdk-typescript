@@ -65,6 +65,8 @@ import type {
   YoloSetResult,
   McpSetVscodeToolsParams,
   McpSetVscodeToolsResult,
+  McpInvokeResponseParams,
+  McpInvokeResponseResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1615,6 +1617,14 @@ export class AutohandSDK {
   ): Promise<McpSetVscodeToolsResult> {
     await this.ensureStarted();
     return this.client.setVscodeMcpTools(params);
+  }
+
+  /** Resolve a VS Code-hosted MCP invocation requested by the CLI. */
+  async respondToMcpInvocation(
+    params: McpInvokeResponseParams
+  ): Promise<McpInvokeResponseResult> {
+    await this.ensureStarted();
+    return this.client.respondToMcpInvocation(params);
   }
 
   /**

@@ -64,6 +64,8 @@ import type {
   YoloSetResult,
   McpSetVscodeToolsParams,
   McpSetVscodeToolsResult,
+  McpInvokeResponseParams,
+  McpInvokeResponseResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -568,6 +570,14 @@ export class RPCClient {
   ): Promise<McpSetVscodeToolsResult> {
     const result = await this.transport.request('autohand.mcp.setVscodeTools', params);
     return validateExtensionRpcResult('autohand.mcp.setVscodeTools', result);
+  }
+
+  /** Resolve a VS Code-hosted MCP invocation requested by the CLI. */
+  async respondToMcpInvocation(
+    params: McpInvokeResponseParams
+  ): Promise<McpInvokeResponseResult> {
+    const result = await this.transport.request('autohand.mcp.invokeResponse', params);
+    return validateExtensionRpcResult('autohand.mcp.invokeResponse', result);
   }
 
   /**
