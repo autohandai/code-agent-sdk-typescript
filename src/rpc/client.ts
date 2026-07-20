@@ -95,6 +95,7 @@ import type {
   McpGetServerConfigsResult,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
+import { validateSessionControlRpcResult } from '../validation/session-control-rpc-results.js';
 
 function scopedDecision(
   allowed: boolean,
@@ -338,7 +339,8 @@ export class RPCClient {
    * Reset the current conversation and begin a new CLI session.
    */
   async reset(): Promise<ResetResult> {
-    return this.transport.request('autohand.reset', {}) as Promise<ResetResult>;
+    const result = await this.transport.request('autohand.reset', {});
+    return validateSessionControlRpcResult('autohand.reset', result);
   }
 
   /**
@@ -367,10 +369,11 @@ export class RPCClient {
   async createBrowserHandoff(
     params: BrowserHandoffCreateParams = {}
   ): Promise<BrowserHandoffCreateResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.browserHandoff.create',
       params
-    ) as Promise<BrowserHandoffCreateResult>;
+    );
+    return validateSessionControlRpcResult('autohand.browserHandoff.create', result);
   }
 
   /**
@@ -379,60 +382,66 @@ export class RPCClient {
   async attachBrowserHandoff(
     params: BrowserHandoffAttachParams
   ): Promise<BrowserHandoffAttachResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.browserHandoff.attach',
       params
-    ) as Promise<BrowserHandoffAttachResult>;
+    );
+    return validateSessionControlRpcResult('autohand.browserHandoff.attach', result);
   }
 
   /**
    * Attach the newest unexpired browser handoff.
    */
   async attachLatestBrowserHandoff(): Promise<BrowserHandoffAttachResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.browserHandoff.attachLatest',
       {}
-    ) as Promise<BrowserHandoffAttachResult>;
+    );
+    return validateSessionControlRpcResult('autohand.browserHandoff.attachLatest', result);
   }
 
   /**
    * Start an autonomous auto-mode session.
    */
   async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.start',
       params
-    ) as Promise<AutomodeStartResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.start', result);
   }
 
   /**
    * Get the current auto-mode runtime and persisted state.
    */
   async getAutomodeStatus(): Promise<AutomodeStatusResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.status',
       {}
-    ) as Promise<AutomodeStatusResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.status', result);
   }
 
   /**
    * Pause the active auto-mode session.
    */
   async pauseAutomode(): Promise<AutomodeOperationResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.pause',
       {}
-    ) as Promise<AutomodeOperationResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.pause', result);
   }
 
   /**
    * Resume a paused auto-mode session.
    */
   async resumeAutomode(): Promise<AutomodeOperationResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.resume',
       {}
-    ) as Promise<AutomodeOperationResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.resume', result);
   }
 
   /**
@@ -441,10 +450,11 @@ export class RPCClient {
   async cancelAutomode(
     params: AutomodeCancelParams = {}
   ): Promise<AutomodeOperationResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.cancel',
       params
-    ) as Promise<AutomodeOperationResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.cancel', result);
   }
 
   /**
@@ -453,10 +463,11 @@ export class RPCClient {
   async getAutomodeLog(
     params: AutomodeGetLogParams = {}
   ): Promise<AutomodeGetLogResult> {
-    return this.transport.request(
+    const result = await this.transport.request(
       'autohand.automode.getLog',
       params
-    ) as Promise<AutomodeGetLogResult>;
+    );
+    return validateSessionControlRpcResult('autohand.automode.getLog', result);
   }
 
   /**

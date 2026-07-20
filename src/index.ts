@@ -49,6 +49,12 @@ export { AutohandSDK, formatSlashCommand } from './sdk/index.js';
 export { RPCClient } from './rpc/client.js';
 
 /**
+ * Structured errors raised when a CLI session-control result violates its RPC schema.
+ */
+export { RpcResultValidationError } from './validation/session-control-rpc-results.js';
+export type { SessionControlRpcMethod } from './validation/session-control-rpc-results.js';
+
+/**
  * Transport layer for CLI subprocess communication
  */
 export { Transport } from './transport/transport.js';

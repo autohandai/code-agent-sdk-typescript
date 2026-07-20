@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { RpcResultValidationError } from '../index.js';
 import { Agent } from '../sdk/agent.js';
 import { AutohandSDK } from '../sdk/index.js';
 import { RPCClient } from '../rpc/client.js';
@@ -291,5 +292,147 @@ describe('auto-mode control RPCs', () => {
     } as unknown as AutohandSDK;
     const agent = Agent.fromSDK(sdk);
     await expect(agent.getAutomodeLog(params)).resolves.toEqual(log);
+  });
+});
+
+describe('session control RPC result validation', () => {
+  const malformedResults: Array<{
+    name: string;
+    method: string;
+    result: unknown;
+    expectedPath: string;
+    invoke: (client: RPCClient) => Promise<unknown>;
+  }> = [
+    {
+      name: 'reset results with a non-string session ID',
+      method: 'autohand.reset',
+      result: { sessionId: 42 },
+      expectedPath: '$.sessionId',
+      invoke: (client) => client.reset(),
+    },
+    {
+      name: 'browser handoff creation results with a malformed URL',
+      method: 'autohand.browserHandoff.create',
+      result: {
+        token: 'handoff-token',
+        sessionId: 'session-browser',
+        workspaceRoot: '/workspace',
+        createdAt: '2026-07-20T00:00:00.000Z',
+        expiresAt: '2026-07-20T00:10:00.000Z',
+        url: 42,
+      },
+      expectedPath: '$.url',
+      invoke: (client) => client.createBrowserHandoff(),
+    },
+    {
+      name: 'browser handoff attachment results with a malformed optional count',
+      method: 'autohand.browserHandoff.attach',
+      result: { success: true, messageCount: 'three' },
+      expectedPath: '$.messageCount',
+      invoke: (client) => client.attachBrowserHandoff({ token: 'handoff-token' }),
+    },
+    {
+      name: 'latest browser handoff results with a malformed success flag',
+      method: 'autohand.browserHandoff.attachLatest',
+      result: { success: 'yes' },
+      expectedPath: '$.success',
+      invoke: (client) => client.attachLatestBrowserHandoff(),
+    },
+    {
+      name: 'auto-mode start results with a malformed optional error',
+      method: 'autohand.automode.start',
+      result: { success: false, error: 17 },
+      expectedPath: '$.error',
+      invoke: (client) => client.startAutomode({ prompt: 'Ship the SDK' }),
+    },
+    {
+      name: 'auto-mode status results with an unknown nested status',
+      method: 'autohand.automode.status',
+      result: {
+        active: true,
+        paused: false,
+        state: {
+          sessionId: 'automode-session',
+          status: 'queued',
+          currentIteration: 1,
+          maxIterations: 10,
+          filesCreated: 0,
+          filesModified: 1,
+        },
+      },
+      expectedPath: '$.state.status',
+      invoke: (client) => client.getAutomodeStatus(),
+    },
+    {
+      name: 'auto-mode pause results with a malformed success flag',
+      method: 'autohand.automode.pause',
+      result: { success: 1 },
+      expectedPath: '$.success',
+      invoke: (client) => client.pauseAutomode(),
+    },
+    {
+      name: 'auto-mode resume results with a malformed optional error',
+      method: 'autohand.automode.resume',
+      result: { success: false, error: { message: 'not paused' } },
+      expectedPath: '$.error',
+      invoke: (client) => client.resumeAutomode(),
+    },
+    {
+      name: 'auto-mode cancellation results that are not objects',
+      method: 'autohand.automode.cancel',
+      result: null,
+      expectedPath: '$',
+      invoke: (client) => client.cancelAutomode(),
+    },
+    {
+      name: 'auto-mode log results with a malformed nested checkpoint',
+      method: 'autohand.automode.getLog',
+      result: {
+        success: true,
+        iterations: [{
+          iteration: 1,
+          timestamp: '2026-07-20T00:01:00.000Z',
+          actions: ['edited src/index.ts'],
+          checkpoint: { commit: 17, message: 'iteration 1' },
+        }],
+      },
+      expectedPath: '$.iterations[0].checkpoint.commit',
+      invoke: (client) => client.getAutomodeLog({ limit: 1 }),
+    },
+  ];
+
+  for (const malformed of malformedResults) {
+    it(`rejects ${malformed.name}`, async () => {
+      const client = new RPCClient();
+      getTransport(client).request = async () => malformed.result;
+
+      try {
+        await malformed.invoke(client);
+        throw new Error('Expected the malformed RPC result to be rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RpcResultValidationError);
+        if (error instanceof RpcResultValidationError) {
+          expect(error.method).toBe(malformed.method);
+          expect(error.path).toBe(malformed.expectedPath);
+        }
+      }
+    });
+  }
+
+  it('accepts omitted optional result fields', async () => {
+    const client = new RPCClient();
+    const results = [
+      { success: false },
+      { active: false, paused: false },
+    ];
+    getTransport(client).request = async () => results.shift();
+
+    await expect(
+      client.attachBrowserHandoff({ token: 'missing-handoff' })
+    ).resolves.toEqual({ success: false });
+    await expect(client.getAutomodeStatus()).resolves.toEqual({
+      active: false,
+      paused: false,
+    });
   });
 });
