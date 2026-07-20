@@ -9,6 +9,8 @@ import type {
   PermissionAcknowledgedResult,
   DirectoryAccessResponseParams,
   DirectoryAccessResponseResult,
+  DirectoryAccessAcknowledgedParams,
+  DirectoryAccessAcknowledgedResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -708,5 +710,11 @@ export class Agent {
     params: DirectoryAccessResponseParams
   ): Promise<DirectoryAccessResponseResult> {
     return this.sdk.respondToDirectoryAccess(params);
+  }
+
+  async acknowledgeDirectoryAccess(
+    params: DirectoryAccessAcknowledgedParams
+  ): Promise<DirectoryAccessAcknowledgedResult> {
+    return this.sdk.acknowledgeDirectoryAccess(params);
   }
 }

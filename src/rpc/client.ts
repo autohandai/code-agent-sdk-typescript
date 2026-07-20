@@ -50,6 +50,8 @@ import type {
   PermissionAcknowledgedResult,
   DirectoryAccessResponseParams,
   DirectoryAccessResponseResult,
+  DirectoryAccessAcknowledgedParams,
+  DirectoryAccessAcknowledgedResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -499,6 +501,17 @@ export class RPCClient {
   ): Promise<DirectoryAccessResponseResult> {
     const result = await this.transport.request('autohand.directoryAccessResponse', params);
     return validateExtensionRpcResult('autohand.directoryAccessResponse', result);
+  }
+
+  /** Acknowledge receipt of a directory-access request before resolving it. */
+  async acknowledgeDirectoryAccess(
+    params: DirectoryAccessAcknowledgedParams
+  ): Promise<DirectoryAccessAcknowledgedResult> {
+    const result = await this.transport.request(
+      'autohand.directoryAccessAcknowledged',
+      params
+    );
+    return validateExtensionRpcResult('autohand.directoryAccessAcknowledged', result);
   }
 
   /**

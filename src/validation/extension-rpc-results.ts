@@ -1,6 +1,7 @@
 import { RpcResultValidationError } from './session-control-rpc-results.js';
 import type {
   DirectoryAccessResponseResult,
+  DirectoryAccessAcknowledgedResult,
   PermissionAcknowledgedResult,
 } from '../types/index.js';
 
@@ -45,9 +46,19 @@ function directoryAccessResponseResult(
   return { success: boolean(record.success, method, `${path}.success`) };
 }
 
+function directoryAccessAcknowledgedResult(
+  value: unknown,
+  method: string,
+  path: string
+): DirectoryAccessAcknowledgedResult {
+  const record = object(value, method, path);
+  return { success: boolean(record.success, method, `${path}.success`) };
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
+  'autohand.directoryAccessAcknowledged': DirectoryAccessAcknowledgedResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -59,6 +70,8 @@ const validators: {
     permissionAcknowledgedResult(value, 'autohand.permissionAcknowledged', path),
   'autohand.directoryAccessResponse': (value, path) =>
     directoryAccessResponseResult(value, 'autohand.directoryAccessResponse', path),
+  'autohand.directoryAccessAcknowledged': (value, path) =>
+    directoryAccessAcknowledgedResult(value, 'autohand.directoryAccessAcknowledged', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

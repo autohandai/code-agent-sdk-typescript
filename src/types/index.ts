@@ -1886,6 +1886,16 @@ export interface DirectoryAccessResponseResult {
   success: boolean;
 }
 
+/** Parameters for acknowledging receipt of a directory-access request. */
+export interface DirectoryAccessAcknowledgedParams {
+  requestId: string;
+}
+
+/** Result returned after acknowledging a directory-access request. */
+export interface DirectoryAccessAcknowledgedResult {
+  success: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

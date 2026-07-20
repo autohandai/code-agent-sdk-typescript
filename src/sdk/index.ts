@@ -51,6 +51,8 @@ import type {
   PermissionAcknowledgedResult,
   DirectoryAccessResponseParams,
   DirectoryAccessResponseResult,
+  DirectoryAccessAcknowledgedParams,
+  DirectoryAccessAcknowledgedResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1549,6 +1551,14 @@ export class AutohandSDK {
   ): Promise<DirectoryAccessResponseResult> {
     await this.ensureStarted();
     return this.client.respondToDirectoryAccess(params);
+  }
+
+  /** Acknowledge receipt of a pending workspace-directory access request. */
+  async acknowledgeDirectoryAccess(
+    params: DirectoryAccessAcknowledgedParams
+  ): Promise<DirectoryAccessAcknowledgedResult> {
+    await this.ensureStarted();
+    return this.client.acknowledgeDirectoryAccess(params);
   }
 
   /**
