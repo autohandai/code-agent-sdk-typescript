@@ -58,6 +58,8 @@ import type {
   GetHistoryResult,
   GetSessionParams,
   GetSessionResult,
+  SessionAttachParams,
+  SessionAttachResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -536,6 +538,12 @@ export class RPCClient {
   async getSession(params: GetSessionParams): Promise<GetSessionResult> {
     const result = await this.transport.request('autohand.getSession', params);
     return validateExtensionRpcResult('autohand.getSession', result);
+  }
+
+  /** Attach this RPC connection to a saved session. */
+  async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
+    const result = await this.transport.request('autohand.session.attach', params);
+    return validateExtensionRpcResult('autohand.session.attach', result);
   }
 
   /**

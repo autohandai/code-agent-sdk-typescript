@@ -5,6 +5,7 @@ import type {
   GetSessionResult,
   GetSessionSuccessResult,
   RpcMessage,
+  SessionAttachResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -203,6 +204,26 @@ function getSessionResult(value: unknown, method: string, path: string): GetSess
   return result;
 }
 
+function sessionAttachResult(value: unknown, method: string, path: string): SessionAttachResult {
+  const record = object(value, method, path);
+  const result: SessionAttachResult = {
+    success: boolean(record.success, method, `${path}.success`),
+  };
+  if (record.sessionId !== undefined) {
+    result.sessionId = string(record.sessionId, method, `${path}.sessionId`);
+  }
+  if (record.workspaceRoot !== undefined) {
+    result.workspaceRoot = string(record.workspaceRoot, method, `${path}.workspaceRoot`);
+  }
+  if (record.messageCount !== undefined) {
+    result.messageCount = number(record.messageCount, method, `${path}.messageCount`);
+  }
+  if (record.error !== undefined) {
+    result.error = string(record.error, method, `${path}.error`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -210,6 +231,7 @@ interface ExtensionRpcResultMap {
   'autohand.changesDecision': ChangesDecisionResult;
   'autohand.getHistory': GetHistoryResult;
   'autohand.getSession': GetSessionResult;
+  'autohand.session.attach': SessionAttachResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -229,6 +251,8 @@ const validators: {
     getHistoryResult(value, 'autohand.getHistory', path),
   'autohand.getSession': (value, path) =>
     getSessionResult(value, 'autohand.getSession', path),
+  'autohand.session.attach': (value, path) =>
+    sessionAttachResult(value, 'autohand.session.attach', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

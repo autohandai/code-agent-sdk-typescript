@@ -1960,6 +1960,18 @@ export interface GetSessionFailureResult {
 
 export type GetSessionResult = GetSessionSuccessResult | GetSessionFailureResult;
 
+export interface SessionAttachParams {
+  sessionId: string;
+}
+
+export interface SessionAttachResult {
+  success: boolean;
+  sessionId?: string;
+  workspaceRoot?: string;
+  messageCount?: number;
+  error?: string;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

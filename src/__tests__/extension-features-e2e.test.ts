@@ -295,4 +295,33 @@ describe('extension RPC features', () => {
       sdk.getSession(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.getSession/);
   });
+
+  it('attaches a saved session through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.session.attach',
+      params: { sessionId: 'session-1' },
+      result: {
+        success: true,
+        sessionId: 'session-1',
+        workspaceRoot: '/workspace',
+        messageCount: 8,
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.attachSession(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed saved-session attachment result', async () => {
+    const fixture = {
+      method: 'autohand.session.attach',
+      params: { sessionId: 'session-1' },
+      result: { success: false, error: 404 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.attachSession(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.session\.attach/);
+  });
 });

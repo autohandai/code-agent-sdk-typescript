@@ -17,6 +17,8 @@ import type {
   GetHistoryResult,
   GetSessionParams,
   GetSessionResult,
+  SessionAttachParams,
+  SessionAttachResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -734,5 +736,9 @@ export class Agent {
 
   async getSession(params: GetSessionParams): Promise<GetSessionResult> {
     return this.sdk.getSession(params);
+  }
+
+  async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
+    return this.sdk.attachSession(params);
   }
 }

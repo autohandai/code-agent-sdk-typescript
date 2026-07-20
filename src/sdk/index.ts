@@ -59,6 +59,8 @@ import type {
   GetHistoryResult,
   GetSessionParams,
   GetSessionResult,
+  SessionAttachParams,
+  SessionAttachResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1583,6 +1585,12 @@ export class AutohandSDK {
   async getSession(params: GetSessionParams): Promise<GetSessionResult> {
     await this.ensureStarted();
     return this.client.getSession(params);
+  }
+
+  /** Attach this SDK instance to a saved session. */
+  async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
+    await this.ensureStarted();
+    return this.client.attachSession(params);
   }
 
   /**
