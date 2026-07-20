@@ -41,6 +41,7 @@ import type {
   AutomodeStartParams,
   AutomodeStartResult,
   AutomodeStatusResult,
+  AutomodeOperationResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1458,6 +1459,14 @@ export class AutohandSDK {
   async getAutomodeStatus(): Promise<AutomodeStatusResult> {
     await this.ensureStarted();
     return this.client.getAutomodeStatus();
+  }
+
+  /**
+   * Pause the active auto-mode session.
+   */
+  async pauseAutomode(): Promise<AutomodeOperationResult> {
+    await this.ensureStarted();
+    return this.client.pauseAutomode();
   }
 
   // ============================================================================

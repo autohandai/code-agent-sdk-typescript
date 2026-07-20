@@ -1947,6 +1947,11 @@ export interface AutomodeStatusResult {
   state?: AutomodeState;
 }
 
+export interface AutomodeOperationResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface GetStateResult {
   status: 'idle' | 'processing' | 'waiting_permission';
   sessionId: string | null;

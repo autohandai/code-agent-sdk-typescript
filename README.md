@@ -430,6 +430,14 @@ const status = await agent.getAutomodeStatus();
 console.log(status.active, status.state?.currentIteration);
 ```
 
+#### `pauseAutomode(): Promise<AutomodeOperationResult>`
+
+Pause the active auto-mode loop at its next safe control point.
+
+```typescript
+const result = await agent.pauseAutomode();
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

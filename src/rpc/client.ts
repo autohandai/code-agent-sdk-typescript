@@ -41,6 +41,7 @@ import type {
   AutomodeStartParams,
   AutomodeStartResult,
   AutomodeStatusResult,
+  AutomodeOperationResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -409,6 +410,16 @@ export class RPCClient {
       'autohand.automode.status',
       {}
     ) as Promise<AutomodeStatusResult>;
+  }
+
+  /**
+   * Pause the active auto-mode session.
+   */
+  async pauseAutomode(): Promise<AutomodeOperationResult> {
+    return this.transport.request(
+      'autohand.automode.pause',
+      {}
+    ) as Promise<AutomodeOperationResult>;
   }
 
   /**
