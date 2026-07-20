@@ -423,6 +423,16 @@ export class RPCClient {
   }
 
   /**
+   * Resume a paused auto-mode session.
+   */
+  async resumeAutomode(): Promise<AutomodeOperationResult> {
+    return this.transport.request(
+      'autohand.automode.resume',
+      {}
+    ) as Promise<AutomodeOperationResult>;
+  }
+
+  /**
    * Respond to a permission request
    * 
    * @param params - Permission response parameters

@@ -211,4 +211,26 @@ describe('auto-mode control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.pauseAutomode()).resolves.toEqual(paused);
   });
+
+  it('resumes auto-mode through every public layer', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const resumed = { success: true };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return resumed;
+    };
+
+    await expect(client.resumeAutomode()).resolves.toEqual(resumed);
+    expect(calls).toEqual([{
+      method: 'autohand.automode.resume',
+      params: {},
+    }]);
+
+    const sdk = {
+      resumeAutomode: async () => resumed,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.resumeAutomode()).resolves.toEqual(resumed);
+  });
 });

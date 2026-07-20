@@ -438,6 +438,14 @@ Pause the active auto-mode loop at its next safe control point.
 const result = await agent.pauseAutomode();
 ```
 
+#### `resumeAutomode(): Promise<AutomodeOperationResult>`
+
+Resume a paused auto-mode loop.
+
+```typescript
+const result = await agent.resumeAutomode();
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

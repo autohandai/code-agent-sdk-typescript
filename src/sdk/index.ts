@@ -1469,6 +1469,14 @@ export class AutohandSDK {
     return this.client.pauseAutomode();
   }
 
+  /**
+   * Resume a paused auto-mode session.
+   */
+  async resumeAutomode(): Promise<AutomodeOperationResult> {
+    await this.ensureStarted();
+    return this.client.resumeAutomode();
+  }
+
   // ============================================================================
   // Permission Handling
   // ============================================================================

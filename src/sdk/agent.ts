@@ -589,6 +589,10 @@ export class Agent {
     return this.sdk.pauseAutomode();
   }
 
+  async resumeAutomode(): Promise<AutomodeOperationResult> {
+    return this.sdk.resumeAutomode();
+  }
+
   async setPlanMode(enabled: boolean): Promise<void> {
     await this.sdk.setPlanMode(enabled);
   }
