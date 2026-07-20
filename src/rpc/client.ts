@@ -28,6 +28,7 @@ import type {
   PromptResult,
   AbortParams,
   AbortResult,
+  ResetResult,
   PlanModeSetResult,
   GetStateParams,
   GetStateResult,
@@ -320,6 +321,13 @@ export class RPCClient {
    */
   async abort(params: AbortParams = {}): Promise<AbortResult> {
     return this.transport.request('autohand.abort', params) as Promise<AbortResult>;
+  }
+
+  /**
+   * Reset the current conversation and begin a new CLI session.
+   */
+  async reset(): Promise<ResetResult> {
+    return this.transport.request('autohand.reset', {}) as Promise<ResetResult>;
   }
 
   /**

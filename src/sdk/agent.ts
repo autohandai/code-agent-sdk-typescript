@@ -8,6 +8,7 @@ import type {
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
+  ResetResult,
   SDKConfig,
   SDKEvent,
   SlashCommand,
@@ -546,6 +547,10 @@ export class Agent {
 
   async close(): Promise<void> {
     await this.sdk.close();
+  }
+
+  async reset(): Promise<ResetResult> {
+    return this.sdk.reset();
   }
 
   async setPlanMode(enabled: boolean): Promise<void> {

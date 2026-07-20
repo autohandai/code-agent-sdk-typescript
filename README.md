@@ -370,6 +370,15 @@ await agent.createGoal({
 
 Abort the current operation.
 
+#### `reset(): Promise<ResetResult>`
+
+Clear the current conversation and start a fresh CLI session. The returned
+`sessionId` identifies the new session.
+
+```typescript
+const { sessionId } = await agent.reset();
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

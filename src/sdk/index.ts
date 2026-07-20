@@ -34,6 +34,7 @@ import type {
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
   SDKEvent,
@@ -1353,6 +1354,14 @@ export class AutohandSDK {
    */
   async abort(): Promise<void> {
     return this.interrupt();
+  }
+
+  /**
+   * Reset the current conversation and return the new session ID.
+   */
+  async reset(): Promise<ResetResult> {
+    await this.ensureStarted();
+    return this.client.reset();
   }
 
   /**
