@@ -2,6 +2,7 @@ import type {
   AutomodeCompleteEvent,
   AutomodeErrorEvent,
   AutomodeIterationEvent,
+  HookPreToolEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +70,24 @@ export function parseAutomodeErrorEvent(value: unknown): AutomodeErrorEvent | un
     type: 'automode_error',
     sessionId: value.sessionId,
     error: value.error,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI pre-tool hook notification at the transport trust boundary. */
+export function parseHookPreToolEvent(value: unknown): HookPreToolEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.toolId !== 'string'
+    || typeof value.toolName !== 'string'
+    || !isRecord(value.args)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_pre_tool',
+    toolId: value.toolId,
+    toolName: value.toolName,
+    args: value.args,
     timestamp: value.timestamp,
   };
 }

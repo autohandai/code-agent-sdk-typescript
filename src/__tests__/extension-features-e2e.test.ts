@@ -720,4 +720,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed pre-tool hook events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.hook.preTool',
+      params: { toolId: 'tool-1', toolName: 'write_file', args: { path: 'a.ts' }, timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'hook_pre_tool', ...notification.params });
+  });
+
+  it('drops malformed pre-tool hook events', async () => {
+    const malformed = {
+      method: 'autohand.hook.preTool',
+      params: { toolId: 'tool-1', toolName: 'write_file', args: 'a.ts', timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });
