@@ -125,6 +125,7 @@ import type {
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 import { validateSessionControlRpcResult } from '../validation/session-control-rpc-results.js';
 import { validateExtensionRpcResult } from '../validation/extension-rpc-results.js';
+import { parseAutomodeIterationEvent } from '../validation/extension-notifications.js';
 
 function scopedDecision(
   allowed: boolean,
@@ -1067,6 +1068,11 @@ export class RPCClient {
       const event: { type: 'permission_request'; requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; timestamp: string; options?: string[] } = { type: 'permission_request', requestId: p.requestId, tool: p.tool, description: p.description, context: p.context, timestamp: p.timestamp };
       if (p.options !== undefined) event.options = p.options;
       this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.automode.iteration', (params) => {
+      const event = parseAutomodeIterationEvent(params);
+      if (event !== undefined) this.queueEvent(event);
     });
 
     const queueAutoresearchEvent = (phase: AutoresearchLifecycleEvent['phase'], params: unknown): void => {

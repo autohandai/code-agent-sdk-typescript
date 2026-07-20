@@ -2340,9 +2340,19 @@ export type SDKEvent =
   | ToolEndEvent
   | FileModifiedEvent
   | PermissionRequestEvent
+  | AutomodeIterationEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
+
+export interface AutomodeIterationEvent {
+  type: 'automode_iteration';
+  sessionId: string;
+  iteration: number;
+  actions: string[];
+  tokensUsed?: number;
+  timestamp: string;
+}
 
 export interface AutoresearchEvent {
   type: 'autoresearch';

@@ -10,7 +10,7 @@ async function createFeatureCli(options: {
   method: string;
   params: Record<string, unknown>;
   result: unknown;
-  notification?: { method: string; params: Record<string, unknown> };
+  notifications?: Array<{ method: string; params: Record<string, unknown> }>;
 }): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'autohand-ts-features-'));
   temporaryDirectories.push(directory);
@@ -36,11 +36,11 @@ for await (const line of lines) {
         messageCount: 0,
       },
     }) + '\\n');
-    if (fixture.notification !== undefined) {
+    for (const notification of fixture.notifications ?? []) {
       process.stdout.write(JSON.stringify({
         jsonrpc: '2.0',
-        method: fixture.notification.method,
-        params: fixture.notification.params,
+        method: notification.method,
+        params: notification.params,
       }) + '\\n');
     }
     continue;
@@ -78,6 +78,15 @@ async function withSDK<T>(
   } finally {
     await sdk.close();
   }
+}
+
+async function nextNotification(sdk: AutohandSDK) {
+  const events = sdk.events();
+  const next = events.next();
+  await sdk.getState();
+  const event = await next;
+  await events.return(undefined);
+  return event.value;
 }
 
 afterEach(async () => {
@@ -593,5 +602,60 @@ describe('extension RPC features', () => {
     await expect(withSDK(fixture, (sdk) =>
       sdk.setContextCompact(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.setContextCompact/);
+  });
+});
+
+describe('extension notification features', () => {
+  it('streams typed auto-mode iteration events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.automode.iteration',
+      params: {
+        sessionId: 'automode-1',
+        iteration: 3,
+        actions: ['edited src/index.ts', 'ran tests'],
+        tokensUsed: 1_250,
+        timestamp: '2026-07-20T00:03:00.000Z',
+      },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+
+    await expect(withSDK({
+      method: 'unused',
+      params: {},
+      result: {},
+      notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({
+      type: 'automode_iteration',
+      ...notification.params,
+    });
+  });
+
+  it('drops malformed auto-mode iterations without hiding later valid events', async () => {
+    const malformed = {
+      method: 'autohand.automode.iteration',
+      params: {
+        sessionId: 'automode-1',
+        iteration: 'three',
+        actions: [],
+        timestamp: '2026-07-20T00:03:00.000Z',
+      },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+
+    await expect(withSDK({
+      method: 'unused',
+      params: {},
+      result: {},
+      notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({
+      type: 'error',
+      ...sentinel.params,
+    });
   });
 });
