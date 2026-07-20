@@ -54,6 +54,8 @@ import type {
   DirectoryAccessAcknowledgedResult,
   ChangesDecisionParams,
   ChangesDecisionResult,
+  GetHistoryParams,
+  GetHistoryResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -520,6 +522,12 @@ export class RPCClient {
   async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
     const result = await this.transport.request('autohand.changesDecision', params);
     return validateExtensionRpcResult('autohand.changesDecision', result);
+  }
+
+  /** Return paginated saved-session metadata. */
+  async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
+    const result = await this.transport.request('autohand.getHistory', params);
+    return validateExtensionRpcResult('autohand.getHistory', result);
   }
 
   /**

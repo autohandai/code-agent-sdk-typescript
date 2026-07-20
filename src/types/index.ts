@@ -1913,6 +1913,28 @@ export interface ChangesDecisionResult {
   errors?: Array<{ changeId: string; error: string }>;
 }
 
+export interface GetHistoryParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface RpcHistoryEntry {
+  sessionId: string;
+  createdAt: string;
+  lastActiveAt: string;
+  projectName: string;
+  model: string;
+  messageCount: number;
+  status: 'active' | 'completed' | 'crashed';
+}
+
+export interface GetHistoryResult {
+  sessions: RpcHistoryEntry[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

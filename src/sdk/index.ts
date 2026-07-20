@@ -55,6 +55,8 @@ import type {
   DirectoryAccessAcknowledgedResult,
   ChangesDecisionParams,
   ChangesDecisionResult,
+  GetHistoryParams,
+  GetHistoryResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1567,6 +1569,12 @@ export class AutohandSDK {
   async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
     await this.ensureStarted();
     return this.client.decideChanges(params);
+  }
+
+  /** Return paginated saved-session metadata. */
+  async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
+    await this.ensureStarted();
+    return this.client.getHistory(params);
   }
 
   /**

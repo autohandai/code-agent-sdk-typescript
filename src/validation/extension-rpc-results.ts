@@ -1,6 +1,8 @@
 import { RpcResultValidationError } from './session-control-rpc-results.js';
 import type {
   ChangesDecisionResult,
+  GetHistoryResult,
+  RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
   PermissionAcknowledgedResult,
@@ -105,11 +107,44 @@ function changesDecisionResult(
   return result;
 }
 
+function historyStatus(
+  value: unknown,
+  method: string,
+  path: string
+): RpcHistoryEntry['status'] {
+  if (value === 'active' || value === 'completed' || value === 'crashed') return value;
+  return invalid(method, path, 'active | completed | crashed', value);
+}
+
+function historyEntry(value: unknown, method: string, path: string): RpcHistoryEntry {
+  const record = object(value, method, path);
+  return {
+    sessionId: string(record.sessionId, method, `${path}.sessionId`),
+    createdAt: string(record.createdAt, method, `${path}.createdAt`),
+    lastActiveAt: string(record.lastActiveAt, method, `${path}.lastActiveAt`),
+    projectName: string(record.projectName, method, `${path}.projectName`),
+    model: string(record.model, method, `${path}.model`),
+    messageCount: number(record.messageCount, method, `${path}.messageCount`),
+    status: historyStatus(record.status, method, `${path}.status`),
+  };
+}
+
+function getHistoryResult(value: unknown, method: string, path: string): GetHistoryResult {
+  const record = object(value, method, path);
+  return {
+    sessions: array(record.sessions, method, `${path}.sessions`, historyEntry),
+    currentPage: number(record.currentPage, method, `${path}.currentPage`),
+    totalPages: number(record.totalPages, method, `${path}.totalPages`),
+    totalItems: number(record.totalItems, method, `${path}.totalItems`),
+  };
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
   'autohand.directoryAccessAcknowledged': DirectoryAccessAcknowledgedResult;
   'autohand.changesDecision': ChangesDecisionResult;
+  'autohand.getHistory': GetHistoryResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -125,6 +160,8 @@ const validators: {
     directoryAccessAcknowledgedResult(value, 'autohand.directoryAccessAcknowledged', path),
   'autohand.changesDecision': (value, path) =>
     changesDecisionResult(value, 'autohand.changesDecision', path),
+  'autohand.getHistory': (value, path) =>
+    getHistoryResult(value, 'autohand.getHistory', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

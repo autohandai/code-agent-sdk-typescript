@@ -13,6 +13,8 @@ import type {
   DirectoryAccessAcknowledgedResult,
   ChangesDecisionParams,
   ChangesDecisionResult,
+  GetHistoryParams,
+  GetHistoryResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -722,5 +724,9 @@ export class Agent {
 
   async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
     return this.sdk.decideChanges(params);
+  }
+
+  async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
+    return this.sdk.getHistory(params);
   }
 }

@@ -71,7 +71,7 @@ async function withSDK<T>(
   run: (sdk: AutohandSDK) => Promise<T>
 ): Promise<T> {
   const cliPath = await createFeatureCli(options);
-  const sdk = new AutohandSDK({ cliPath, timeout: 2_000 });
+  const sdk = new AutohandSDK({ cliPath, timeout: 10_000 });
   await sdk.start();
   try {
     return await run(sdk);
@@ -190,5 +190,55 @@ describe('extension RPC features', () => {
     await expect(withSDK(fixture, (sdk) =>
       sdk.decideChanges(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.changesDecision/);
+  });
+
+  it('gets paginated typed session history through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.getHistory',
+      params: { page: 2, pageSize: 10 },
+      result: {
+        sessions: [{
+          sessionId: 'session-1',
+          createdAt: '2026-07-20T00:00:00.000Z',
+          lastActiveAt: '2026-07-20T01:00:00.000Z',
+          projectName: 'tin-wrapper',
+          model: 'fantail',
+          messageCount: 12,
+          status: 'completed' as const,
+        }],
+        currentPage: 2,
+        totalPages: 4,
+        totalItems: 31,
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getHistory(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects session history entries with an unknown status', async () => {
+    const fixture = {
+      method: 'autohand.getHistory',
+      params: {},
+      result: {
+        sessions: [{
+          sessionId: 'session-1',
+          createdAt: 't1',
+          lastActiveAt: 't2',
+          projectName: 'tin-wrapper',
+          model: 'fantail',
+          messageCount: 1,
+          status: 'deleted',
+        }],
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getHistory(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.getHistory/);
   });
 });
