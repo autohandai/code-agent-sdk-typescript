@@ -40,11 +40,42 @@ describe('SDK release workflow', () => {
 
     expect(workflow).toContain('release_notes_only requires an explicit version');
     expect(workflow).toContain('skip_npm_publish=true');
+    expect(workflow).toContain('git checkout --detach "$candidate_tag"');
     expect(workflow).toContain("steps.version.outputs.release_notes_only != 'true' && steps.publish-state.outputs.skip_npm_publish != 'true'");
 
     expect(readWorkflowStep(workflow, 'Update existing GitHub release with generated notes')).toContain('draft: true');
     expect(readWorkflowStep(workflow, 'Update existing GitHub release')).toContain('draft: true');
     expect(readWorkflowStep(workflow, 'Publish GitHub release')).toContain("if: steps.version.outputs.release_notes_only != 'true'");
+  });
+
+  it('tags a reproducible detached release commit without pushing it to protected main', () => {
+    const workflow = readRepositoryFile('.github/workflows/release.yml');
+
+    expect(workflow.includes('git push origin HEAD:main')).toBe(false);
+    expect(readWorkflowStep(workflow, 'Create detached release commit')).toContain(
+      'git commit',
+    );
+    expect(readWorkflowStep(workflow, 'Tag detached release commit')).toContain(
+      'git tag -a "${{ steps.version.outputs.tag }}" HEAD',
+    );
+    expect(readWorkflowStep(workflow, 'Push release tag')).toContain(
+      'git push origin "${{ steps.version.outputs.tag }}"',
+    );
+  });
+
+  it('accepts only release-shaped annotated tags for publish-existing recovery', () => {
+    const workflow = readRepositoryFile('.github/workflows/release.yml');
+
+    expect(workflow).toContain('git cat-file -t "$candidate_tag"');
+    expect(workflow).toContain('must be an annotated tag');
+    expect(workflow).toContain('must point to a one-parent release commit');
+    expect(workflow).toContain('git merge-base --is-ancestor "$tag_parent" origin/main');
+    expect(workflow).toContain(
+      'git diff --name-only "$tag_parent" "$tag_commit"',
+    );
+    expect(workflow).toContain(
+      'package.json|package-lock.json|CHANGELOG.md',
+    );
   });
 
   it('documents the protected-main stable release path', () => {
@@ -53,6 +84,7 @@ describe('SDK release workflow', () => {
     expect(publishingGuide).toContain('protected `main`');
     expect(publishingGuide).toContain('publish_existing');
     expect(publishingGuide).toContain('release_notes_only');
+    expect(publishingGuide).toContain('provenance identifies the workflow trigger');
   });
 
   it('stores curated notes for v1.0.2 and v1.0.3', () => {

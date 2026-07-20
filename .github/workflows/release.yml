@@ -142,10 +142,59 @@ jobs:
               version="$(node -p "require('./package.json').version")"
             fi
 
-            package_version="$(node -p "require('./package.json').version")"
-            if [ "$version" != "$package_version" ]; then
-              echo "::error::publish_existing version '$version' must match package.json version '$package_version'."
-              exit 1
+            candidate_tag="v$version"
+            if git rev-parse --verify --quiet "${candidate_tag}^{commit}" >/dev/null; then
+              if [ "$(git cat-file -t "$candidate_tag")" != "tag" ]; then
+                echo "::error::publish_existing candidate '$candidate_tag' must be an annotated tag."
+                exit 1
+              fi
+
+              tag_commit="$(git rev-parse "${candidate_tag}^{commit}")"
+              read -r -a tag_line <<< "$(git rev-list --parents -n 1 "$tag_commit")"
+              if [ "${#tag_line[@]}" -ne 2 ]; then
+                echo "::error::publish_existing candidate '$candidate_tag' must point to a one-parent release commit."
+                exit 1
+              fi
+              tag_parent="${tag_line[1]}"
+
+              if ! git merge-base --is-ancestor "$tag_parent" origin/main; then
+                echo "::error::publish_existing candidate '$candidate_tag' must descend directly from source reachable through origin/main."
+                exit 1
+              fi
+
+              expected_subject="chore(release): $candidate_tag"
+              actual_subject="$(git log -1 --format=%s "$tag_commit")"
+              if [ "$actual_subject" != "$expected_subject" ]; then
+                echo "::error::publish_existing candidate '$candidate_tag' must use release commit subject '$expected_subject'."
+                exit 1
+              fi
+
+              while IFS= read -r changed_file; do
+                case "$changed_file" in
+                  package.json|package-lock.json|CHANGELOG.md)
+                    ;;
+                  *)
+                    echo "::error::publish_existing candidate '$candidate_tag' changes unexpected file '$changed_file'."
+                    exit 1
+                    ;;
+                esac
+              done < <(git diff --name-only "$tag_parent" "$tag_commit")
+
+              tagged_package_version="$(
+                git show "${candidate_tag}:package.json" \
+                  | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(input).version));"
+              )"
+              if [ "$version" != "$tagged_package_version" ]; then
+                echo "::error::publish_existing version '$version' must match tagged package version '$tagged_package_version'."
+                exit 1
+              fi
+              git checkout --detach "$candidate_tag"
+            else
+              package_version="$(node -p "require('./package.json').version")"
+              if [ "$version" != "$package_version" ]; then
+                echo "::error::publish_existing version '$version' must match package.json version '$package_version'."
+                exit 1
+              fi
             fi
 
             release_kind="existing"
@@ -401,9 +450,10 @@ jobs:
             }
           " "$package_name" "$npm_user"
 
-      - name: Commit version and changelog
+      - name: Create detached release commit
         if: steps.version.outputs.publish_existing != 'true'
         run: |
+          git checkout --detach "$GITHUB_SHA"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json CHANGELOG.md
@@ -412,15 +462,13 @@ jobs:
             -m "Prepare the validated package, changelog, and release tag." \
             -m "Co-authored-by: Autohand Evolve <code-noreply@autohand.ai>"
 
-      - name: Tag release
+      - name: Tag detached release commit
         if: steps.version.outputs.publish_existing != 'true'
-        run: git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+        run: git tag -a "${{ steps.version.outputs.tag }}" HEAD -m "Release ${{ steps.version.outputs.tag }}"
 
-      - name: Push version and tag
+      - name: Push release tag
         if: steps.version.outputs.publish_existing != 'true'
-        run: |
-          git push origin HEAD:main
-          git push origin "${{ steps.version.outputs.tag }}"
+        run: git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Prepare draft GitHub release with generated notes
         if: steps.version.outputs.publish_existing != 'true' && steps.version.outputs.release_notes_previous_tag != ''

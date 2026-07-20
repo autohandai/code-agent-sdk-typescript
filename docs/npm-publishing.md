@@ -32,7 +32,7 @@ The workflow:
 4. Generates local release notes and prepends `CHANGELOG.md` from the previous-tag git diff.
 5. Runs the package validation gate.
 6. Builds the npm tarball and verifies that `README.md` and `CHANGELOG.md` are present.
-7. Commits the version/changelog update, tags the release, and pushes both to GitHub.
+7. Creates a detached release commit containing the generated version and changelog, tags it, and pushes only the tag to GitHub.
 8. Creates or updates a draft GitHub release with the tarball, SHA-256 checksum, local notes, and GitHub-generated release notes pinned to the previous stable tag.
 9. Publishes the same packed tarball to npm with provenance.
 10. Publishes the GitHub release only after npm publishing succeeds.
@@ -43,9 +43,11 @@ Manual runs create stable releases such as `v1.0.2` and publish them under the s
 
 ### Protected main branch
 
-This repository has a protected `main` branch with pull-request and verified-signature requirements. Generated release commits can be pushed automatically only when `RELEASE_GITHUB_TOKEN` is configured for an actor that is allowed to bypass those rules. The workflow falls back to `github.token`, but that token does not bypass the repository rules; importantly, the workflow attempts the protected push before creating a draft or publishing to npm, so a rejected push cannot leave an unpublished Git tag paired with a public package.
+This repository has a protected `main` branch with pull-request and verified-signature requirements. The release workflow never pushes generated commits to that branch and therefore does not require a bypass-capable token. It creates the generated package-version and changelog commit in detached HEAD state, records that source and release metadata under an annotated tag, and pushes only the tag. The checked-out `main` commit remains unchanged.
 
-When no bypass-capable release token is configured, prepare the stable version commit and annotated tag as an authorized maintainer, push both, and run `Release SDK` with `publish_existing` enabled. This path skips all Git writes while preserving package validation, the packed artifact and checksum, npm provenance, release-note generation, and the rule that npm must succeed before the GitHub release becomes public.
+The tag is pushed before the draft release and npm publication so repository permission failures cannot leave a public package without its source tag. If a later publishing step fails, rerun `Release SDK` with the explicit version and `publish_existing` enabled. Recovery accepts only an annotated, one-parent release commit whose parent is reachable from `origin/main` and whose diff is limited to `package.json`, `package-lock.json`, and `CHANGELOG.md`; it then validates the recorded version, rebuilds that tagged source, and skips duplicate npm publication when necessary.
+
+npm provenance identifies the workflow trigger commit and ref. Because the generated release commit is created later inside that run, provenance does not claim that the detached tag itself triggered publication. The annotated tag records the generated package metadata and source, while the uploaded tarball checksum identifies the exact published artifact. A release policy requiring provenance to resolve directly to the tag must use a second publishing run triggered from that tag.
 
 Curated GitHub release bodies live in `docs/releases/vX.Y.Z.md`. The `publish_existing` and `release_notes_only` modes prefer that versioned file when it exists; otherwise they generate notes from the exact preceding-stable-tag to requested-tag range.
 
@@ -64,24 +66,17 @@ Dependabot is configured for npm dependencies and GitHub Actions. Its pull reque
 
 ## Release Flow
 
-For bleeding-edge alpha releases, merge or push to `main`. The release workflow skips its own `chore(release): ...` commits to avoid a release loop.
+For bleeding-edge alpha releases, merge or push to `main`. The release workflow leaves `main` unchanged and publishes the generated detached release commit under an alpha tag.
 
-For a stable release when `RELEASE_GITHUB_TOKEN` can bypass the protected branch:
+For a stable release:
 
 1. Run `Release SDK` from the Actions tab.
 2. Choose a stable bump type or provide an explicit version.
 3. Select the npm dist-tag, normally `latest`.
-4. Wait for it to create the version commit, changelog entry, tag, draft GitHub release, npm tarball, checksum, npm publish, and final public GitHub release.
+4. Wait for it to create the detached version/changelog commit, annotated tag, draft GitHub release, npm tarball, checksum, npm publish, and final public GitHub release.
+5. Verify that `main` was not mutated, the release tag contains the generated version, and npm/GitHub expose the same artifact version.
 
-For the protected-main maintainer path:
-
-1. Update `package.json`, `package-lock.json`, and `CHANGELOG.md` to the release version.
-2. Run the complete validation gate and commit the files with the required co-author trailer.
-3. Create and push the annotated version tag together with the version commit.
-4. Run `Release SDK` with the explicit version, `publish_existing` enabled, and the intended npm dist-tag.
-5. Verify the workflow, npm version and dist-tag, GitHub assets, checksum, and public release state.
-
-If a GitHub release already exists or its notes need repair, rerun `Release SDK` with `publish_existing` enabled. The version must match `package.json`; the workflow will skip the commit and tag steps, refresh the GitHub release notes/assets from the previous stable tag, validate the package, publish the current package if npm does not already have it, and publish the GitHub release.
+If a GitHub release already exists or a tagged release needs repair, rerun `Release SDK` with the explicit version and `publish_existing` enabled. The workflow checks out the existing tag and verifies its `package.json` version, skips the commit and tag steps, refreshes the GitHub release notes/assets from the previous stable tag, validates the package, publishes it only when npm does not already have it, and publishes the GitHub release.
 
 To repair only the GitHub release notes for an older published tag, run `Release SDK` with `release_notes_only` enabled and provide the explicit version, for example `1.0.2`. That mode builds the commit range against the requested tag, refreshes the release body from its preceding stable tag, and does not change `package.json`, create a tag, build a package, or publish to npm.
 
