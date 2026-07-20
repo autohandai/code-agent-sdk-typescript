@@ -62,6 +62,8 @@ import type {
   SessionAttachResult,
   YoloSetParams,
   YoloSetResult,
+  McpSetVscodeToolsParams,
+  McpSetVscodeToolsResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -558,6 +560,14 @@ export class RPCClient {
   async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
     const result = await this.transport.request('autohand.yolo.set', params);
     return validateExtensionRpcResult('autohand.yolo.set', result);
+  }
+
+  /** Replace the CLI's VS Code-hosted MCP tool descriptors. */
+  async setVscodeMcpTools(
+    params: McpSetVscodeToolsParams
+  ): Promise<McpSetVscodeToolsResult> {
+    const result = await this.transport.request('autohand.mcp.setVscodeTools', params);
+    return validateExtensionRpcResult('autohand.mcp.setVscodeTools', result);
   }
 
   /**

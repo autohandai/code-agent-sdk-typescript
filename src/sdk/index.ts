@@ -63,6 +63,8 @@ import type {
   SessionAttachResult,
   YoloSetParams,
   YoloSetResult,
+  McpSetVscodeToolsParams,
+  McpSetVscodeToolsResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1605,6 +1607,14 @@ export class AutohandSDK {
   async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
     await this.ensureStarted();
     return this.client.setYoloCompat(params);
+  }
+
+  /** Replace the CLI's VS Code-hosted MCP tool descriptors. */
+  async setVscodeMcpTools(
+    params: McpSetVscodeToolsParams
+  ): Promise<McpSetVscodeToolsResult> {
+    await this.ensureStarted();
+    return this.client.setVscodeMcpTools(params);
   }
 
   /**

@@ -1982,6 +1982,25 @@ export interface YoloSetResult {
   expiresIn?: number;
 }
 
+export interface VscodeMcpToolDescriptor {
+  name: string;
+  description: string;
+  serverName: string;
+  inputSchema?: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+export interface McpSetVscodeToolsParams {
+  tools: VscodeMcpToolDescriptor[];
+}
+
+export interface McpSetVscodeToolsResult {
+  success: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

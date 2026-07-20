@@ -360,4 +360,39 @@ describe('extension RPC features', () => {
       sdk.setYolo(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.yoloSet/);
   });
+
+  it('registers VS Code MCP tools through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.mcp.setVscodeTools',
+      params: {
+        tools: [{
+          name: 'vscode.findReferences',
+          description: 'Find symbol references',
+          serverName: 'vscode',
+          inputSchema: {
+            type: 'object' as const,
+            properties: { symbol: { type: 'string' } },
+            required: ['symbol'],
+          },
+        }],
+      },
+      result: { success: true },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setVscodeMcpTools(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed VS Code MCP registration result', async () => {
+    const fixture = {
+      method: 'autohand.mcp.setVscodeTools',
+      params: { tools: [] },
+      result: { success: null },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setVscodeMcpTools(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.mcp\.setVscodeTools/);
+  });
 });

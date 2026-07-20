@@ -21,6 +21,8 @@ import type {
   SessionAttachResult,
   YoloSetParams,
   YoloSetResult,
+  McpSetVscodeToolsParams,
+  McpSetVscodeToolsResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -750,5 +752,11 @@ export class Agent {
 
   async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
     return this.sdk.setYoloCompat(params);
+  }
+
+  async setVscodeMcpTools(
+    params: McpSetVscodeToolsParams
+  ): Promise<McpSetVscodeToolsResult> {
+    return this.sdk.setVscodeMcpTools(params);
   }
 }
