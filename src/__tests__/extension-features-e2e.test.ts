@@ -241,4 +241,58 @@ describe('extension RPC features', () => {
       sdk.getHistory(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.getHistory/);
   });
+
+  it('gets typed session details and messages through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.getSession',
+      params: { sessionId: 'session-1' },
+      result: {
+        success: true as const,
+        sessionId: 'session-1',
+        projectName: 'tin-wrapper',
+        model: 'fantail',
+        messageCount: 1,
+        status: 'completed',
+        createdAt: '2026-07-20T00:00:00.000Z',
+        lastActiveAt: '2026-07-20T01:00:00.000Z',
+        summary: 'Implemented the feature.',
+        messages: [{
+          id: 'message-1',
+          role: 'assistant' as const,
+          content: 'Done',
+          timestamp: '2026-07-20T01:00:00.000Z',
+          toolCalls: [{ id: 'tool-1', name: 'write_file', args: { path: 'a.ts' } }],
+        }],
+        workspaceRoot: '/workspace',
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getSession(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('returns a typed missing-session result', async () => {
+    const fixture = {
+      method: 'autohand.getSession',
+      params: { sessionId: 'missing' },
+      result: { success: false as const, error: 'Session not found' },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getSession(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects incomplete successful session details', async () => {
+    const fixture = {
+      method: 'autohand.getSession',
+      params: { sessionId: 'session-1' },
+      result: { success: true, sessionId: 'session-1' },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getSession(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.getSession/);
+  });
 });

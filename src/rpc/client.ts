@@ -56,6 +56,8 @@ import type {
   ChangesDecisionResult,
   GetHistoryParams,
   GetHistoryResult,
+  GetSessionParams,
+  GetSessionResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -528,6 +530,12 @@ export class RPCClient {
   async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
     const result = await this.transport.request('autohand.getHistory', params);
     return validateExtensionRpcResult('autohand.getHistory', result);
+  }
+
+  /** Return one saved session with its messages and workspace metadata. */
+  async getSession(params: GetSessionParams): Promise<GetSessionResult> {
+    const result = await this.transport.request('autohand.getSession', params);
+    return validateExtensionRpcResult('autohand.getSession', result);
   }
 
   /**

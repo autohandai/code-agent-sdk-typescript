@@ -15,6 +15,8 @@ import type {
   ChangesDecisionResult,
   GetHistoryParams,
   GetHistoryResult,
+  GetSessionParams,
+  GetSessionResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -728,5 +730,9 @@ export class Agent {
 
   async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
     return this.sdk.getHistory(params);
+  }
+
+  async getSession(params: GetSessionParams): Promise<GetSessionResult> {
+    return this.sdk.getSession(params);
   }
 }

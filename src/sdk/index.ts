@@ -57,6 +57,8 @@ import type {
   ChangesDecisionResult,
   GetHistoryParams,
   GetHistoryResult,
+  GetSessionParams,
+  GetSessionResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1575,6 +1577,12 @@ export class AutohandSDK {
   async getHistory(params: GetHistoryParams = {}): Promise<GetHistoryResult> {
     await this.ensureStarted();
     return this.client.getHistory(params);
+  }
+
+  /** Return one saved session with its messages and workspace metadata. */
+  async getSession(params: GetSessionParams): Promise<GetSessionResult> {
+    await this.ensureStarted();
+    return this.client.getSession(params);
   }
 
   /**

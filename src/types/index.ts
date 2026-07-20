@@ -1935,6 +1935,31 @@ export interface GetHistoryResult {
   totalItems: number;
 }
 
+export interface GetSessionParams {
+  sessionId: string;
+}
+
+export interface GetSessionSuccessResult {
+  success: true;
+  sessionId: string;
+  projectName: string;
+  model: string;
+  messageCount: number;
+  status: string;
+  createdAt: string;
+  lastActiveAt: string;
+  summary?: string;
+  messages: RpcMessage[];
+  workspaceRoot: string;
+}
+
+export interface GetSessionFailureResult {
+  success: false;
+  error?: string;
+}
+
+export type GetSessionResult = GetSessionSuccessResult | GetSessionFailureResult;
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

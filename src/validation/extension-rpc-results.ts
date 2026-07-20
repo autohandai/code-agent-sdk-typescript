@@ -2,6 +2,9 @@ import { RpcResultValidationError } from './session-control-rpc-results.js';
 import type {
   ChangesDecisionResult,
   GetHistoryResult,
+  GetSessionResult,
+  GetSessionSuccessResult,
+  RpcMessage,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -139,12 +142,74 @@ function getHistoryResult(value: unknown, method: string, path: string): GetHist
   };
 }
 
+function messageRole(value: unknown, method: string, path: string): RpcMessage['role'] {
+  if (value === 'user' || value === 'assistant' || value === 'system' || value === 'tool') {
+    return value;
+  }
+  return invalid(method, path, 'user | assistant | system | tool', value);
+}
+
+function toolCall(
+  value: unknown,
+  method: string,
+  path: string
+): NonNullable<RpcMessage['toolCalls']>[number] {
+  const record = object(value, method, path);
+  return {
+    id: string(record.id, method, `${path}.id`),
+    name: string(record.name, method, `${path}.name`),
+    args: object(record.args, method, `${path}.args`),
+  };
+}
+
+function rpcMessage(value: unknown, method: string, path: string): RpcMessage {
+  const record = object(value, method, path);
+  const message: RpcMessage = {
+    id: string(record.id, method, `${path}.id`),
+    role: messageRole(record.role, method, `${path}.role`),
+    content: string(record.content, method, `${path}.content`),
+    timestamp: string(record.timestamp, method, `${path}.timestamp`),
+  };
+  if (record.toolCalls !== undefined) {
+    message.toolCalls = array(record.toolCalls, method, `${path}.toolCalls`, toolCall);
+  }
+  return message;
+}
+
+function getSessionResult(value: unknown, method: string, path: string): GetSessionResult {
+  const record = object(value, method, path);
+  const succeeded = boolean(record.success, method, `${path}.success`);
+  if (!succeeded) {
+    return record.error === undefined
+      ? { success: false }
+      : { success: false, error: string(record.error, method, `${path}.error`) };
+  }
+
+  const result: GetSessionSuccessResult = {
+    success: true,
+    sessionId: string(record.sessionId, method, `${path}.sessionId`),
+    projectName: string(record.projectName, method, `${path}.projectName`),
+    model: string(record.model, method, `${path}.model`),
+    messageCount: number(record.messageCount, method, `${path}.messageCount`),
+    status: string(record.status, method, `${path}.status`),
+    createdAt: string(record.createdAt, method, `${path}.createdAt`),
+    lastActiveAt: string(record.lastActiveAt, method, `${path}.lastActiveAt`),
+    messages: array(record.messages, method, `${path}.messages`, rpcMessage),
+    workspaceRoot: string(record.workspaceRoot, method, `${path}.workspaceRoot`),
+  };
+  if (record.summary !== undefined) {
+    result.summary = string(record.summary, method, `${path}.summary`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
   'autohand.directoryAccessAcknowledged': DirectoryAccessAcknowledgedResult;
   'autohand.changesDecision': ChangesDecisionResult;
   'autohand.getHistory': GetHistoryResult;
+  'autohand.getSession': GetSessionResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -162,6 +227,8 @@ const validators: {
     changesDecisionResult(value, 'autohand.changesDecision', path),
   'autohand.getHistory': (value, path) =>
     getHistoryResult(value, 'autohand.getHistory', path),
+  'autohand.getSession': (value, path) =>
+    getSessionResult(value, 'autohand.getSession', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(
