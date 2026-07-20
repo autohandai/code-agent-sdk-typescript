@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.3-alpha.24.b7477d0 - 2026-07-20
+
+> Bleeding edge alpha build from main.
+
+Compare: https://github.com/autohandai/code-agent-sdk-typescript/compare/v1.0.3...v1.0.3-alpha.24.b7477d0
+
+### Changes
+
+- ci: release from detached tagged commits (b7477d0)
+- fix: validate session control RPC results (306c40e)
+- feat: add auto-mode iteration log (bad4d74)
+- feat: add auto-mode cancellation (205abe0)
+- feat: add auto-mode resume (0fa544c)
+- feat: add auto-mode pause (5abfa1a)
+- feat: add auto-mode status (aa7bb95)
+- feat: add auto-mode start (00bf7ec)
+- feat: add latest browser handoff attachment (ed61f23)
+- feat: add browser handoff attachment (be8e31a)
+- feat: add browser handoff creation (95aff87)
+- feat: add conversation reset (9e15384)
+- feat: harden transport and add discovery APIs (6a43c02)
+
 ## Unreleased
 
 ### Added
