@@ -53,6 +53,8 @@ import type {
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedParams,
   DirectoryAccessAcknowledgedResult,
+  ChangesDecisionParams,
+  ChangesDecisionResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1559,6 +1561,12 @@ export class AutohandSDK {
   ): Promise<DirectoryAccessAcknowledgedResult> {
     await this.ensureStarted();
     return this.client.acknowledgeDirectoryAccess(params);
+  }
+
+  /** Apply or reject a batch of proposed file changes. */
+  async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
+    await this.ensureStarted();
+    return this.client.decideChanges(params);
   }
 
   /**

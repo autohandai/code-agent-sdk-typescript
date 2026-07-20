@@ -52,6 +52,8 @@ import type {
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedParams,
   DirectoryAccessAcknowledgedResult,
+  ChangesDecisionParams,
+  ChangesDecisionResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -512,6 +514,12 @@ export class RPCClient {
       params
     );
     return validateExtensionRpcResult('autohand.directoryAccessAcknowledged', result);
+  }
+
+  /** Apply or reject a batch of proposed file changes. */
+  async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
+    const result = await this.transport.request('autohand.changesDecision', params);
+    return validateExtensionRpcResult('autohand.changesDecision', result);
   }
 
   /**

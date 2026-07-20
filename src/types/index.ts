@@ -1896,6 +1896,23 @@ export interface DirectoryAccessAcknowledgedResult {
   success: boolean;
 }
 
+export type ChangesDecisionAction = 'accept_all' | 'reject_all' | 'accept_selected';
+
+/** Decision for a CLI-proposed batch of file changes. */
+export interface ChangesDecisionParams {
+  batchId: string;
+  action: ChangesDecisionAction;
+  selectedChangeIds?: string[];
+}
+
+/** Outcome of applying a multi-file change decision. */
+export interface ChangesDecisionResult {
+  success: boolean;
+  appliedCount: number;
+  skippedCount: number;
+  errors?: Array<{ changeId: string; error: string }>;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

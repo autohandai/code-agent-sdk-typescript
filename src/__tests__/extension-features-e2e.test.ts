@@ -158,4 +158,37 @@ describe('extension RPC features', () => {
       sdk.acknowledgeDirectoryAccess(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.directoryAccessAcknowledged/);
   });
+
+  it('applies a typed multi-file change decision through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.changesDecision',
+      params: {
+        batchId: 'batch-1',
+        action: 'accept_selected' as const,
+        selectedChangeIds: ['change-1'],
+      },
+      result: {
+        success: true,
+        appliedCount: 1,
+        skippedCount: 1,
+        errors: [{ changeId: 'change-2', error: 'conflict' }],
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.decideChanges(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects malformed multi-file change decision counts', async () => {
+    const fixture = {
+      method: 'autohand.changesDecision',
+      params: { batchId: 'batch-1', action: 'accept_all' as const },
+      result: { success: true, appliedCount: 'one', skippedCount: 0 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.decideChanges(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.changesDecision/);
+  });
 });

@@ -11,6 +11,8 @@ import type {
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedParams,
   DirectoryAccessAcknowledgedResult,
+  ChangesDecisionParams,
+  ChangesDecisionResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -716,5 +718,9 @@ export class Agent {
     params: DirectoryAccessAcknowledgedParams
   ): Promise<DirectoryAccessAcknowledgedResult> {
     return this.sdk.acknowledgeDirectoryAccess(params);
+  }
+
+  async decideChanges(params: ChangesDecisionParams): Promise<ChangesDecisionResult> {
+    return this.sdk.decideChanges(params);
   }
 }
