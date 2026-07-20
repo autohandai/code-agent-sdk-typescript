@@ -2349,9 +2349,18 @@ export type SDKEvent =
   | HookPostResponseEvent
   | McpInvokeRequestEvent
   | McpToolsChangedEvent
+  | LearnProgressEvent
+  | UnknownNotificationEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
+
+/** Raw fallback for a JSON-RPC notification introduced by a newer CLI. */
+export interface UnknownNotificationEvent {
+  type: 'unknown_notification';
+  method: string;
+  params: unknown;
+}
 
 export interface AutomodeIterationEvent {
   type: 'automode_iteration';
@@ -2423,6 +2432,19 @@ export interface McpInvokeRequestEvent {
 export interface McpToolsChangedEvent {
   type: 'mcp_tools_changed';
   tools: McpToolSummary[];
+  timestamp: string;
+}
+
+export type LearnProgressStatus =
+  | 'analyzing'
+  | 'loading-registry'
+  | 'evaluating'
+  | 'generating'
+  | 'updating';
+
+export interface LearnProgressEvent {
+  type: 'learn_progress';
+  status: LearnProgressStatus;
   timestamp: string;
 }
 

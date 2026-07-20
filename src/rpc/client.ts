@@ -135,6 +135,7 @@ import {
   parseHookPostResponseEvent,
   parseMcpInvokeRequestEvent,
   parseMcpToolsChangedEvent,
+  parseLearnProgressEvent,
 } from '../validation/extension-notifications.js';
 
 function scopedDecision(
@@ -988,6 +989,10 @@ export class RPCClient {
    * @private
    */
   private setupNotificationHandlers(): void {
+    this.transport.onUnknownNotification((method, params) => {
+      this.queueEvent({ type: 'unknown_notification', method, params });
+    });
+
     // Agent lifecycle
     this.transport.onNotification('autohand.agentStart', (params) => {
       const p = params as { sessionId: string; model: string; workspace: string; timestamp: string };
@@ -1122,6 +1127,11 @@ export class RPCClient {
 
     this.transport.onNotification('autohand.mcp.toolsChanged', (params) => {
       const event = parseMcpToolsChangedEvent(params);
+      if (event !== undefined) this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.learn.progress', (params) => {
+      const event = parseLearnProgressEvent(params);
       if (event !== undefined) this.queueEvent(event);
     });
 

@@ -9,6 +9,8 @@ import type {
   McpInvokeRequestEvent,
   McpToolSummary,
   McpToolsChangedEvent,
+  LearnProgressEvent,
+  LearnProgressStatus,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -208,4 +210,22 @@ export function parseMcpToolsChangedEvent(value: unknown): McpToolsChangedEvent 
     tools.push(tool);
   }
   return { type: 'mcp_tools_changed', tools, timestamp: value.timestamp };
+}
+
+function isLearnProgressStatus(value: unknown): value is LearnProgressStatus {
+  return value === 'analyzing'
+    || value === 'loading-registry'
+    || value === 'evaluating'
+    || value === 'generating'
+    || value === 'updating';
+}
+
+/** Parse a CLI project-learning progress notification at the transport trust boundary. */
+export function parseLearnProgressEvent(value: unknown): LearnProgressEvent | undefined {
+  if (!isRecord(value)
+    || !isLearnProgressStatus(value.status)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return { type: 'learn_progress', status: value.status, timestamp: value.timestamp };
 }

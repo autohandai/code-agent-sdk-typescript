@@ -223,6 +223,7 @@ export class Transport {
   private lineReader: LineReader | null = null;
   private pendingRequests = new Map<number | string, PendingRequest>();
   private notificationCallbacks = new Map<string, (params: unknown) => void>();
+  private unknownNotificationCallback: ((method: string, params: unknown) => void) | null = null;
   private terminationCallbacks = new Set<(error: Error) => void>();
   private requestIdCounter = 0;
   private debug: boolean;
@@ -493,6 +494,11 @@ export class Transport {
     this.notificationCallbacks.set(method, callback);
   }
 
+  /** Register the raw fallback invoked when no method-specific handler exists. */
+  onUnknownNotification(callback: (method: string, params: unknown) => void): void {
+    this.unknownNotificationCallback = callback;
+  }
+
   /**
    * Remove a notification callback
    * 
@@ -607,6 +613,8 @@ export class Transport {
         const callback = this.notificationCallbacks.get(response.method);
         if (callback) {
           callback(response.params);
+        } else {
+          this.unknownNotificationCallback?.(response.method, response.params);
         }
       }
     } catch (error) {

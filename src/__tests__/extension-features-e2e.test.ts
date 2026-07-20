@@ -888,4 +888,50 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed learning progress events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.learn.progress',
+      params: { status: 'loading-registry', timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'learn_progress', ...notification.params });
+  });
+
+  it('drops malformed learning progress events', async () => {
+    const malformed = {
+      method: 'autohand.learn.progress',
+      params: { status: 'done', timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
+
+  it('preserves unknown notifications through the public event stream', async () => {
+    const notification = {
+      method: 'autohand.future.event',
+      params: { value: 7, nested: { retained: true } },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({
+      type: 'unknown_notification',
+      method: notification.method,
+      params: notification.params,
+    });
+  });
 });
