@@ -379,6 +379,18 @@ Clear the current conversation and start a fresh CLI session. The returned
 const { sessionId } = await agent.reset();
 ```
 
+#### `createBrowserHandoff(params?): Promise<BrowserHandoffCreateResult>`
+
+Create a ten-minute, one-time handoff for the active session. Pass an extension
+ID to receive a Chrome extension URL, or an install URL for a web handoff.
+
+```typescript
+const handoff = await agent.createBrowserHandoff({
+  extensionId: 'your-extension-id',
+});
+console.log(handoff.url);
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

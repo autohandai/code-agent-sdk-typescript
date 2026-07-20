@@ -1848,6 +1848,11 @@ export interface GetMessagesParams {
   limit?: number;
 }
 
+export interface BrowserHandoffCreateParams {
+  extensionId?: string;
+  installUrl?: string;
+}
+
 export interface PermissionResponseParams {
   requestId: string;
   decision?: PermissionDecision | PermissionDecisionAlias;
@@ -1874,6 +1879,15 @@ export interface PlanModeSetResult {
 
 export interface ResetResult {
   sessionId: string;
+}
+
+export interface BrowserHandoffCreateResult {
+  token: string;
+  sessionId: string;
+  workspaceRoot: string;
+  createdAt: string;
+  expiresAt: string;
+  url: string;
 }
 
 export interface GetStateResult {

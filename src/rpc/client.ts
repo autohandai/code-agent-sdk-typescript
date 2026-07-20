@@ -34,6 +34,8 @@ import type {
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  BrowserHandoffCreateParams,
+  BrowserHandoffCreateResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -348,6 +350,18 @@ export class RPCClient {
    */
   async getMessages(params: GetMessagesParams = {}): Promise<GetMessagesResult> {
     return this.transport.request('autohand.getMessages', params) as Promise<GetMessagesResult>;
+  }
+
+  /**
+   * Create a one-time browser handoff for the active session.
+   */
+  async createBrowserHandoff(
+    params: BrowserHandoffCreateParams = {}
+  ): Promise<BrowserHandoffCreateResult> {
+    return this.transport.request(
+      'autohand.browserHandoff.create',
+      params
+    ) as Promise<BrowserHandoffCreateResult>;
   }
 
   /**

@@ -34,6 +34,8 @@ import type {
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  BrowserHandoffCreateParams,
+  BrowserHandoffCreateResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1407,6 +1409,16 @@ export class AutohandSDK {
   async getMessages(params?: GetMessagesParams): Promise<GetMessagesResult> {
     await this.ensureStarted();
     return this.client.getMessages(params);
+  }
+
+  /**
+   * Create a browser handoff URL for the active session.
+   */
+  async createBrowserHandoff(
+    params: BrowserHandoffCreateParams = {}
+  ): Promise<BrowserHandoffCreateResult> {
+    await this.ensureStarted();
+    return this.client.createBrowserHandoff(params);
   }
 
   // ============================================================================
