@@ -1917,6 +1917,36 @@ export interface AutomodeStartResult {
   error?: string;
 }
 
+export type AutomodeSessionStatus =
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'cancelled'
+  | 'failed';
+
+export interface AutomodeCheckpoint {
+  commit: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface AutomodeState {
+  sessionId: string;
+  status: AutomodeSessionStatus;
+  currentIteration: number;
+  maxIterations: number;
+  filesCreated: number;
+  filesModified: number;
+  branch?: string;
+  lastCheckpoint?: AutomodeCheckpoint;
+}
+
+export interface AutomodeStatusResult {
+  active: boolean;
+  paused: boolean;
+  state?: AutomodeState;
+}
+
 export interface GetStateResult {
   status: 'idle' | 'processing' | 'waiting_permission';
   sessionId: string | null;

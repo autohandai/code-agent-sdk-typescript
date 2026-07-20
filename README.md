@@ -420,6 +420,16 @@ const started = await agent.startAutomode({
 });
 ```
 
+#### `getAutomodeStatus(): Promise<AutomodeStatusResult>`
+
+Inspect runtime flags plus the latest persisted session state, iteration counts,
+branch, file totals, and checkpoint metadata.
+
+```typescript
+const status = await agent.getAutomodeStatus();
+console.log(status.active, status.state?.currentIteration);
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

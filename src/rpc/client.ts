@@ -40,6 +40,7 @@ import type {
   BrowserHandoffAttachResult,
   AutomodeStartParams,
   AutomodeStartResult,
+  AutomodeStatusResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -398,6 +399,16 @@ export class RPCClient {
       'autohand.automode.start',
       params
     ) as Promise<AutomodeStartResult>;
+  }
+
+  /**
+   * Get the current auto-mode runtime and persisted state.
+   */
+  async getAutomodeStatus(): Promise<AutomodeStatusResult> {
+    return this.transport.request(
+      'autohand.automode.status',
+      {}
+    ) as Promise<AutomodeStatusResult>;
   }
 
   /**

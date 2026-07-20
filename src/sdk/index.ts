@@ -40,6 +40,7 @@ import type {
   BrowserHandoffAttachResult,
   AutomodeStartParams,
   AutomodeStartResult,
+  AutomodeStatusResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1449,6 +1450,14 @@ export class AutohandSDK {
   async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
     await this.ensureStarted();
     return this.client.startAutomode(params);
+  }
+
+  /**
+   * Get the current auto-mode runtime and persisted state.
+   */
+  async getAutomodeStatus(): Promise<AutomodeStatusResult> {
+    await this.ensureStarted();
+    return this.client.getAutomodeStatus();
   }
 
   // ============================================================================

@@ -150,4 +150,43 @@ describe('auto-mode control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.startAutomode(params)).resolves.toEqual(started);
   });
+
+  it('returns the complete auto-mode status contract', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const status = {
+      active: true,
+      paused: false,
+      state: {
+        sessionId: 'automode-session',
+        status: 'running' as const,
+        currentIteration: 4,
+        maxIterations: 25,
+        filesCreated: 2,
+        filesModified: 7,
+        branch: 'automode/session',
+        lastCheckpoint: {
+          commit: 'abc1234',
+          message: 'checkpoint iteration 3',
+          timestamp: '2026-07-20T00:03:00.000Z',
+        },
+      },
+    };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return status;
+    };
+
+    await expect(client.getAutomodeStatus()).resolves.toEqual(status);
+    expect(calls).toEqual([{
+      method: 'autohand.automode.status',
+      params: {},
+    }]);
+
+    const sdk = {
+      getAutomodeStatus: async () => status,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.getAutomodeStatus()).resolves.toEqual(status);
+  });
 });

@@ -38,6 +38,7 @@ import type {
   BrowserHandoffAttachResult,
   AutomodeStartParams,
   AutomodeStartResult,
+  AutomodeStatusResult,
   InstallSkillParams,
   InstallSkillResult,
   McpListServersResult,
@@ -577,6 +578,10 @@ export class Agent {
 
   async startAutomode(params: AutomodeStartParams): Promise<AutomodeStartResult> {
     return this.sdk.startAutomode(params);
+  }
+
+  async getAutomodeStatus(): Promise<AutomodeStatusResult> {
+    return this.sdk.getAutomodeStatus();
   }
 
   async setPlanMode(enabled: boolean): Promise<void> {
