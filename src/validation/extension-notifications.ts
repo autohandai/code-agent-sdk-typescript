@@ -1,4 +1,8 @@
-import type { AutomodeCompleteEvent, AutomodeIterationEvent } from '../types/index.js';
+import type {
+  AutomodeCompleteEvent,
+  AutomodeErrorEvent,
+  AutomodeIterationEvent,
+} from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -49,6 +53,22 @@ export function parseAutomodeCompleteEvent(value: unknown): AutomodeCompleteEven
     iterations: value.iterations,
     filesCreated: value.filesCreated,
     filesModified: value.filesModified,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI auto-mode error notification at the transport trust boundary. */
+export function parseAutomodeErrorEvent(value: unknown): AutomodeErrorEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.sessionId !== 'string'
+    || typeof value.error !== 'string'
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'automode_error',
+    sessionId: value.sessionId,
+    error: value.error,
     timestamp: value.timestamp,
   };
 }

@@ -692,4 +692,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed auto-mode error events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.automode.error',
+      params: { sessionId: 'automode-1', error: 'Budget exceeded', timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'automode_error', ...notification.params });
+  });
+
+  it('drops malformed auto-mode error events', async () => {
+    const malformed = {
+      method: 'autohand.automode.error',
+      params: { sessionId: 'automode-1', error: { message: 'bad' }, timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });

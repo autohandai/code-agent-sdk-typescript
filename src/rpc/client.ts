@@ -127,6 +127,7 @@ import { validateSessionControlRpcResult } from '../validation/session-control-r
 import { validateExtensionRpcResult } from '../validation/extension-rpc-results.js';
 import {
   parseAutomodeCompleteEvent,
+  parseAutomodeErrorEvent,
   parseAutomodeIterationEvent,
 } from '../validation/extension-notifications.js';
 
@@ -1080,6 +1081,11 @@ export class RPCClient {
 
     this.transport.onNotification('autohand.automode.complete', (params) => {
       const event = parseAutomodeCompleteEvent(params);
+      if (event !== undefined) this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.automode.error', (params) => {
+      const event = parseAutomodeErrorEvent(params);
       if (event !== undefined) this.queueEvent(event);
     });
 

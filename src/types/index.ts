@@ -2342,6 +2342,7 @@ export type SDKEvent =
   | PermissionRequestEvent
   | AutomodeIterationEvent
   | AutomodeCompleteEvent
+  | AutomodeErrorEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2361,6 +2362,13 @@ export interface AutomodeCompleteEvent {
   iterations: number;
   filesCreated: number;
   filesModified: number;
+  timestamp: string;
+}
+
+export interface AutomodeErrorEvent {
+  type: 'automode_error';
+  sessionId: string;
+  error: string;
   timestamp: string;
 }
 
