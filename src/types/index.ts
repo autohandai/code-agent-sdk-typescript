@@ -1865,6 +1865,16 @@ export interface PermissionResponseParams {
   remember?: boolean;
 }
 
+/** Parameters for acknowledging receipt of a permission request. */
+export interface PermissionAcknowledgedParams {
+  requestId: string;
+}
+
+/** Result returned after a permission request is acknowledged. */
+export interface PermissionAcknowledgedResult {
+  success: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

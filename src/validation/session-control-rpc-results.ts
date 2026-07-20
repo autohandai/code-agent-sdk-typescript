@@ -289,13 +289,13 @@ const sessionControlRpcResultSchemas: {
 };
 
 export class RpcResultValidationError extends Error {
-  readonly method: SessionControlRpcMethod;
+  readonly method: string;
   readonly path: string;
   readonly expected: string;
   readonly actual: string;
 
   constructor(
-    method: SessionControlRpcMethod,
+    method: string,
     path: string,
     expected: string,
     actual: string

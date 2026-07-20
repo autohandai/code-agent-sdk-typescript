@@ -46,6 +46,8 @@ import type {
   AutomodeGetLogParams,
   AutomodeGetLogResult,
   PermissionDecision,
+  PermissionAcknowledgedParams,
+  PermissionAcknowledgedResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -96,6 +98,7 @@ import type {
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 import { validateSessionControlRpcResult } from '../validation/session-control-rpc-results.js';
+import { validateExtensionRpcResult } from '../validation/extension-rpc-results.js';
 
 function scopedDecision(
   allowed: boolean,
@@ -478,6 +481,14 @@ export class RPCClient {
    */
   async permissionResponse(params: PermissionResponseParams): Promise<unknown> {
     return this.transport.request('autohand.permissionResponse', normalizePermissionResponse(params));
+  }
+
+  /** Acknowledge receipt of a permission request before the user decides it. */
+  async acknowledgePermission(
+    params: PermissionAcknowledgedParams
+  ): Promise<PermissionAcknowledgedResult> {
+    const result = await this.transport.request('autohand.permissionAcknowledged', params);
+    return validateExtensionRpcResult('autohand.permissionAcknowledged', result);
   }
 
   /**

@@ -5,6 +5,8 @@ import type {
   GoalSnapshotResult,
   GoalTemplatesResult,
   PermissionDecisionScope,
+  PermissionAcknowledgedParams,
+  PermissionAcknowledgedResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -692,5 +694,11 @@ export class Agent {
 
   async permissionResponse(params: PermissionResponseParams): Promise<void> {
     await this.sdk.permissionResponse(params);
+  }
+
+  async acknowledgePermission(
+    params: PermissionAcknowledgedParams
+  ): Promise<PermissionAcknowledgedResult> {
+    return this.sdk.acknowledgePermission(params);
   }
 }

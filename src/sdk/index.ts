@@ -47,6 +47,8 @@ import type {
   AutomodeGetLogResult,
   ResetResult,
   PermissionDecisionScope,
+  PermissionAcknowledgedParams,
+  PermissionAcknowledgedResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1529,6 +1531,14 @@ export class AutohandSDK {
   async permissionResponse(params: PermissionResponseParams): Promise<void> {
     await this.ensureStarted();
     await this.client.permissionResponse(params);
+  }
+
+  /** Acknowledge receipt of a permission request before sending a decision. */
+  async acknowledgePermission(
+    params: PermissionAcknowledgedParams
+  ): Promise<PermissionAcknowledgedResult> {
+    await this.ensureStarted();
+    return this.client.acknowledgePermission(params);
   }
 
   /**
