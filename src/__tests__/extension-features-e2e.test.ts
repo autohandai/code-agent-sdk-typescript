@@ -500,4 +500,32 @@ describe('extension RPC features', () => {
       sdk.updateLearnedSkills()
     )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.update/);
   });
+
+  it('generates a project skill through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.learn.generate',
+      params: { scope: 'project' as const },
+      result: {
+        success: true,
+        skillName: 'tin-wrapper',
+        skillPath: '/workspace/.autohand/skills/tin-wrapper/SKILL.md',
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.generateSkill(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed generated-skill path', async () => {
+    const fixture = {
+      method: 'autohand.learn.generate',
+      params: { scope: 'user' as const },
+      result: { success: true, skillName: 'shared', skillPath: 17 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.generateSkill(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.generate/);
+  });
 });

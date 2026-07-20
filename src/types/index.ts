@@ -2050,6 +2050,17 @@ export interface LearnUpdateResult {
   error?: string;
 }
 
+export interface LearnGenerateParams {
+  scope: 'project' | 'user';
+}
+
+export interface LearnGenerateResult {
+  success: boolean;
+  skillName?: string;
+  skillPath?: string;
+  error?: string;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

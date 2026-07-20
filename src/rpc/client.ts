@@ -69,6 +69,8 @@ import type {
   LearnRecommendParams,
   LearnRecommendResult,
   LearnUpdateResult,
+  LearnGenerateParams,
+  LearnGenerateResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -595,6 +597,12 @@ export class RPCClient {
   async updateLearnedSkills(): Promise<LearnUpdateResult> {
     const result = await this.transport.request('autohand.learn.update', {});
     return validateExtensionRpcResult('autohand.learn.update', result);
+  }
+
+  /** Generate a reusable skill from the current project context. */
+  async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
+    const result = await this.transport.request('autohand.learn.generate', params);
+    return validateExtensionRpcResult('autohand.learn.generate', result);
   }
 
   /**

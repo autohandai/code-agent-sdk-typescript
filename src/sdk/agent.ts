@@ -28,6 +28,8 @@ import type {
   LearnRecommendParams,
   LearnRecommendResult,
   LearnUpdateResult,
+  LearnGenerateParams,
+  LearnGenerateResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -779,5 +781,9 @@ export class Agent {
 
   async updateLearnedSkills(): Promise<LearnUpdateResult> {
     return this.sdk.updateLearnedSkills();
+  }
+
+  async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
+    return this.sdk.generateSkill(params);
   }
 }

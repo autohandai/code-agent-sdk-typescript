@@ -14,6 +14,7 @@ import type {
   LearnRecommendResult,
   LearnUpdateEntry,
   LearnUpdateResult,
+  LearnGenerateResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -349,6 +350,23 @@ function learnUpdateResult(value: unknown, method: string, path: string): LearnU
   return result;
 }
 
+function learnGenerateResult(value: unknown, method: string, path: string): LearnGenerateResult {
+  const record = object(value, method, path);
+  const result: LearnGenerateResult = {
+    success: boolean(record.success, method, `${path}.success`),
+  };
+  if (record.skillName !== undefined) {
+    result.skillName = string(record.skillName, method, `${path}.skillName`);
+  }
+  if (record.skillPath !== undefined) {
+    result.skillPath = string(record.skillPath, method, `${path}.skillPath`);
+  }
+  if (record.error !== undefined) {
+    result.error = string(record.error, method, `${path}.error`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -363,6 +381,7 @@ interface ExtensionRpcResultMap {
   'autohand.mcp.invokeResponse': McpInvokeResponseResult;
   'autohand.learn.recommend': LearnRecommendResult;
   'autohand.learn.update': LearnUpdateResult;
+  'autohand.learn.generate': LearnGenerateResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -396,6 +415,8 @@ const validators: {
     learnRecommendResult(value, 'autohand.learn.recommend', path),
   'autohand.learn.update': (value, path) =>
     learnUpdateResult(value, 'autohand.learn.update', path),
+  'autohand.learn.generate': (value, path) =>
+    learnGenerateResult(value, 'autohand.learn.generate', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

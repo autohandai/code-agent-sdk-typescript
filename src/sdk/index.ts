@@ -70,6 +70,8 @@ import type {
   LearnRecommendParams,
   LearnRecommendResult,
   LearnUpdateResult,
+  LearnGenerateParams,
+  LearnGenerateResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1642,6 +1644,12 @@ export class AutohandSDK {
   async updateLearnedSkills(): Promise<LearnUpdateResult> {
     await this.ensureStarted();
     return this.client.updateLearnedSkills();
+  }
+
+  /** Generate a reusable skill from the current project context. */
+  async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
+    await this.ensureStarted();
+    return this.client.generateSkill(params);
   }
 
   /**
