@@ -5,6 +5,7 @@ import type {
   HookPreToolEvent,
   HookPostToolEvent,
   HookPrePromptEvent,
+  HookPostResponseEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,6 +130,33 @@ export function parseHookPrePromptEvent(value: unknown): HookPrePromptEvent | un
     type: 'hook_pre_prompt',
     instruction: value.instruction,
     mentionedFiles: value.mentionedFiles,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI post-response hook notification at the transport trust boundary. */
+export function parseHookPostResponseEvent(value: unknown): HookPostResponseEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.tokensUsed !== 'number'
+    || !Number.isFinite(value.tokensUsed)
+    || (value.tokensUsageStatus !== undefined
+      && value.tokensUsageStatus !== 'actual'
+      && value.tokensUsageStatus !== 'unavailable')
+    || typeof value.toolCallsCount !== 'number'
+    || !Number.isFinite(value.toolCallsCount)
+    || typeof value.duration !== 'number'
+    || !Number.isFinite(value.duration)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_post_response',
+    tokensUsed: value.tokensUsed,
+    ...(value.tokensUsageStatus !== undefined
+      ? { tokensUsageStatus: value.tokensUsageStatus }
+      : {}),
+    toolCallsCount: value.toolCallsCount,
+    duration: value.duration,
     timestamp: value.timestamp,
   };
 }

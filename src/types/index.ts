@@ -2346,6 +2346,7 @@ export type SDKEvent =
   | HookPreToolEvent
   | HookPostToolEvent
   | HookPrePromptEvent
+  | HookPostResponseEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2397,6 +2398,15 @@ export interface HookPrePromptEvent {
   type: 'hook_pre_prompt';
   instruction: string;
   mentionedFiles: string[];
+  timestamp: string;
+}
+
+export interface HookPostResponseEvent {
+  type: 'hook_post_response';
+  tokensUsed: number;
+  tokensUsageStatus?: 'actual' | 'unavailable';
+  toolCallsCount: number;
+  duration: number;
   timestamp: string;
 }
 

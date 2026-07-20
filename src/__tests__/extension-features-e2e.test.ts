@@ -804,4 +804,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed post-response hook events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.hook.postResponse',
+      params: { tokensUsed: 900, tokensUsageStatus: 'actual', toolCallsCount: 2, duration: 1250, timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'hook_post_response', ...notification.params });
+  });
+
+  it('drops malformed post-response hook events', async () => {
+    const malformed = {
+      method: 'autohand.hook.postResponse',
+      params: { tokensUsed: 900, tokensUsageStatus: 'estimated', toolCallsCount: 2, duration: 1250, timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });
