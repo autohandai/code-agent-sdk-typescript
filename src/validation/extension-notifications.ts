@@ -3,6 +3,7 @@ import type {
   AutomodeErrorEvent,
   AutomodeIterationEvent,
   HookPreToolEvent,
+  HookPostToolEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +89,29 @@ export function parseHookPreToolEvent(value: unknown): HookPreToolEvent | undefi
     toolId: value.toolId,
     toolName: value.toolName,
     args: value.args,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI post-tool hook notification at the transport trust boundary. */
+export function parseHookPostToolEvent(value: unknown): HookPostToolEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.toolId !== 'string'
+    || typeof value.toolName !== 'string'
+    || typeof value.success !== 'boolean'
+    || typeof value.duration !== 'number'
+    || !Number.isFinite(value.duration)
+    || (value.output !== undefined && typeof value.output !== 'string')
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_post_tool',
+    toolId: value.toolId,
+    toolName: value.toolName,
+    success: value.success,
+    duration: value.duration,
+    ...(value.output !== undefined ? { output: value.output } : {}),
     timestamp: value.timestamp,
   };
 }

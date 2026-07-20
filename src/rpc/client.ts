@@ -130,6 +130,7 @@ import {
   parseAutomodeErrorEvent,
   parseAutomodeIterationEvent,
   parseHookPreToolEvent,
+  parseHookPostToolEvent,
 } from '../validation/extension-notifications.js';
 
 function scopedDecision(
@@ -1092,6 +1093,11 @@ export class RPCClient {
 
     this.transport.onNotification('autohand.hook.preTool', (params) => {
       const event = parseHookPreToolEvent(params);
+      if (event !== undefined) this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.hook.postTool', (params) => {
+      const event = parseHookPostToolEvent(params);
       if (event !== undefined) this.queueEvent(event);
     });
 

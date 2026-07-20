@@ -2344,6 +2344,7 @@ export type SDKEvent =
   | AutomodeCompleteEvent
   | AutomodeErrorEvent
   | HookPreToolEvent
+  | HookPostToolEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2378,6 +2379,16 @@ export interface HookPreToolEvent {
   toolId: string;
   toolName: string;
   args: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface HookPostToolEvent {
+  type: 'hook_post_tool';
+  toolId: string;
+  toolName: string;
+  success: boolean;
+  duration: number;
+  output?: string;
   timestamp: string;
 }
 
