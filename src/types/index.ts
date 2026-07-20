@@ -2348,6 +2348,7 @@ export type SDKEvent =
   | HookPrePromptEvent
   | HookPostResponseEvent
   | McpInvokeRequestEvent
+  | McpToolsChangedEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2416,6 +2417,12 @@ export interface McpInvokeRequestEvent {
   requestId: string;
   toolName: string;
   args: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface McpToolsChangedEvent {
+  type: 'mcp_tools_changed';
+  tools: McpToolSummary[];
   timestamp: string;
 }
 

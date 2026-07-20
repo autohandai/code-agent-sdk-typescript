@@ -860,4 +860,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed MCP tools-changed events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.mcp.toolsChanged',
+      params: { tools: [{ name: 'find', description: 'Find symbols', serverName: 'vscode' }], timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'mcp_tools_changed', ...notification.params });
+  });
+
+  it('drops malformed MCP tools-changed events', async () => {
+    const malformed = {
+      method: 'autohand.mcp.toolsChanged',
+      params: { tools: [{ name: 'find', description: 'Find', serverName: 7 }], timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });

@@ -134,6 +134,7 @@ import {
   parseHookPrePromptEvent,
   parseHookPostResponseEvent,
   parseMcpInvokeRequestEvent,
+  parseMcpToolsChangedEvent,
 } from '../validation/extension-notifications.js';
 
 function scopedDecision(
@@ -1116,6 +1117,11 @@ export class RPCClient {
 
     this.transport.onNotification('autohand.mcp.invokeRequest', (params) => {
       const event = parseMcpInvokeRequestEvent(params);
+      if (event !== undefined) this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.mcp.toolsChanged', (params) => {
+      const event = parseMcpToolsChangedEvent(params);
       if (event !== undefined) this.queueEvent(event);
     });
 

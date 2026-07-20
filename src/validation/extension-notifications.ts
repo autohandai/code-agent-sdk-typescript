@@ -7,6 +7,8 @@ import type {
   HookPrePromptEvent,
   HookPostResponseEvent,
   McpInvokeRequestEvent,
+  McpToolSummary,
+  McpToolsChangedEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -178,4 +180,32 @@ export function parseMcpInvokeRequestEvent(value: unknown): McpInvokeRequestEven
     args: value.args,
     timestamp: value.timestamp,
   };
+}
+
+function parseMcpToolSummary(value: unknown): McpToolSummary | undefined {
+  if (!isRecord(value)
+    || typeof value.name !== 'string'
+    || typeof value.description !== 'string'
+    || typeof value.serverName !== 'string') {
+    return undefined;
+  }
+  return {
+    name: value.name,
+    description: value.description,
+    serverName: value.serverName,
+  };
+}
+
+/** Parse a CLI MCP tools-changed notification at the transport trust boundary. */
+export function parseMcpToolsChangedEvent(value: unknown): McpToolsChangedEvent | undefined {
+  if (!isRecord(value) || !Array.isArray(value.tools) || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  const tools: McpToolSummary[] = [];
+  for (const rawTool of value.tools) {
+    const tool = parseMcpToolSummary(rawTool);
+    if (tool === undefined) return undefined;
+    tools.push(tool);
+  }
+  return { type: 'mcp_tools_changed', tools, timestamp: value.timestamp };
 }
