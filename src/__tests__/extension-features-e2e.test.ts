@@ -658,4 +658,38 @@ describe('extension notification features', () => {
       ...sentinel.params,
     });
   });
+
+  it('streams typed auto-mode completion events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.automode.complete',
+      params: {
+        sessionId: 'automode-1',
+        iterations: 8,
+        filesCreated: 2,
+        filesModified: 5,
+        timestamp: '2026-07-20T00:08:00.000Z',
+      },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'automode_complete', ...notification.params });
+  });
+
+  it('drops malformed auto-mode completion events', async () => {
+    const malformed = {
+      method: 'autohand.automode.complete',
+      params: { sessionId: 'automode-1', iterations: 8, filesCreated: 2, filesModified: 'five', timestamp: 't' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });

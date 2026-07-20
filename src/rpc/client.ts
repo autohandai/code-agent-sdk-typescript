@@ -125,7 +125,10 @@ import type {
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 import { validateSessionControlRpcResult } from '../validation/session-control-rpc-results.js';
 import { validateExtensionRpcResult } from '../validation/extension-rpc-results.js';
-import { parseAutomodeIterationEvent } from '../validation/extension-notifications.js';
+import {
+  parseAutomodeCompleteEvent,
+  parseAutomodeIterationEvent,
+} from '../validation/extension-notifications.js';
 
 function scopedDecision(
   allowed: boolean,
@@ -1072,6 +1075,11 @@ export class RPCClient {
 
     this.transport.onNotification('autohand.automode.iteration', (params) => {
       const event = parseAutomodeIterationEvent(params);
+      if (event !== undefined) this.queueEvent(event);
+    });
+
+    this.transport.onNotification('autohand.automode.complete', (params) => {
+      const event = parseAutomodeCompleteEvent(params);
       if (event !== undefined) this.queueEvent(event);
     });
 
