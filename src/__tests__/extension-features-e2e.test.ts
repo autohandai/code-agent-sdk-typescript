@@ -832,4 +832,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed MCP invocation request events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.mcp.invokeRequest',
+      params: { requestId: 'mcp-1', toolName: 'vscode.findReferences', args: { symbol: 'Agent' }, timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'mcp_invoke_request', ...notification.params });
+  });
+
+  it('drops malformed MCP invocation request events', async () => {
+    const malformed = {
+      method: 'autohand.mcp.invokeRequest',
+      params: { requestId: 'mcp-1', toolName: 'tool', args: [], timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });

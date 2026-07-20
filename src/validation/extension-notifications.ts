@@ -6,6 +6,7 @@ import type {
   HookPostToolEvent,
   HookPrePromptEvent,
   HookPostResponseEvent,
+  McpInvokeRequestEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -157,6 +158,24 @@ export function parseHookPostResponseEvent(value: unknown): HookPostResponseEven
       : {}),
     toolCallsCount: value.toolCallsCount,
     duration: value.duration,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI MCP invocation request at the transport trust boundary. */
+export function parseMcpInvokeRequestEvent(value: unknown): McpInvokeRequestEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.requestId !== 'string'
+    || typeof value.toolName !== 'string'
+    || !isRecord(value.args)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'mcp_invoke_request',
+    requestId: value.requestId,
+    toolName: value.toolName,
+    args: value.args,
     timestamp: value.timestamp,
   };
 }

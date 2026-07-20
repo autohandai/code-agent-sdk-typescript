@@ -2347,6 +2347,7 @@ export type SDKEvent =
   | HookPostToolEvent
   | HookPrePromptEvent
   | HookPostResponseEvent
+  | McpInvokeRequestEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2407,6 +2408,14 @@ export interface HookPostResponseEvent {
   tokensUsageStatus?: 'actual' | 'unavailable';
   toolCallsCount: number;
   duration: number;
+  timestamp: string;
+}
+
+export interface McpInvokeRequestEvent {
+  type: 'mcp_invoke_request';
+  requestId: string;
+  toolName: string;
+  args: Record<string, unknown>;
   timestamp: string;
 }
 
