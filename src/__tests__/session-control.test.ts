@@ -256,4 +256,40 @@ describe('auto-mode control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.cancelAutomode(params)).resolves.toEqual(cancelled);
   });
+
+  it('gets typed auto-mode iteration logs with a wire limit', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const log = {
+      success: true,
+      iterations: [{
+        iteration: 4,
+        timestamp: '2026-07-20T00:04:00.000Z',
+        actions: ['edited src/index.ts', 'ran tests'],
+        tokensUsed: 1_250,
+        cost: 0.42,
+        checkpoint: {
+          commit: 'abc1234',
+          message: 'checkpoint iteration 4',
+        },
+      }],
+    };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return log;
+    };
+    const params = { limit: 5 };
+
+    await expect(client.getAutomodeLog(params)).resolves.toEqual(log);
+    expect(calls).toEqual([{
+      method: 'autohand.automode.getLog',
+      params,
+    }]);
+
+    const sdk = {
+      getAutomodeLog: async () => log,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.getAutomodeLog(params)).resolves.toEqual(log);
+  });
 });

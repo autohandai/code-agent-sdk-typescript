@@ -41,6 +41,8 @@ import type {
   AutomodeStatusResult,
   AutomodeOperationResult,
   AutomodeCancelParams,
+  AutomodeGetLogParams,
+  AutomodeGetLogResult,
   InstallSkillParams,
   InstallSkillResult,
   McpListServersResult,
@@ -598,6 +600,12 @@ export class Agent {
     params: AutomodeCancelParams = {}
   ): Promise<AutomodeOperationResult> {
     return this.sdk.cancelAutomode(params);
+  }
+
+  async getAutomodeLog(
+    params: AutomodeGetLogParams = {}
+  ): Promise<AutomodeGetLogResult> {
+    return this.sdk.getAutomodeLog(params);
   }
 
   async setPlanMode(enabled: boolean): Promise<void> {

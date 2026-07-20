@@ -1956,6 +1956,30 @@ export interface AutomodeCancelParams {
   reason?: string;
 }
 
+export interface AutomodeGetLogParams {
+  limit?: number;
+}
+
+export interface AutomodeLogCheckpoint {
+  commit: string;
+  message: string;
+}
+
+export interface AutomodeLogEntry {
+  iteration: number;
+  timestamp: string;
+  actions: string[];
+  tokensUsed?: number;
+  cost?: number;
+  checkpoint?: AutomodeLogCheckpoint;
+}
+
+export interface AutomodeGetLogResult {
+  success: boolean;
+  iterations: AutomodeLogEntry[];
+  error?: string;
+}
+
 export interface GetStateResult {
   status: 'idle' | 'processing' | 'waiting_permission';
   sessionId: string | null;

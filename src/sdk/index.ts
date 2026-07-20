@@ -43,6 +43,8 @@ import type {
   AutomodeStatusResult,
   AutomodeOperationResult,
   AutomodeCancelParams,
+  AutomodeGetLogParams,
+  AutomodeGetLogResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1486,6 +1488,16 @@ export class AutohandSDK {
   ): Promise<AutomodeOperationResult> {
     await this.ensureStarted();
     return this.client.cancelAutomode(params);
+  }
+
+  /**
+   * Get typed auto-mode iteration log entries.
+   */
+  async getAutomodeLog(
+    params: AutomodeGetLogParams = {}
+  ): Promise<AutomodeGetLogResult> {
+    await this.ensureStarted();
+    return this.client.getAutomodeLog(params);
   }
 
   // ============================================================================

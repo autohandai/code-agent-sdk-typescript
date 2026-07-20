@@ -455,6 +455,16 @@ forwarded using CLI-3's current RPC contract.
 const result = await agent.cancelAutomode({ reason: 'release window closed' });
 ```
 
+#### `getAutomodeLog(params?): Promise<AutomodeGetLogResult>`
+
+Read typed auto-mode iteration entries, optionally limiting the newest results.
+CLI-3 currently returns an empty list until its internal iteration ledger is
+connected to this RPC.
+
+```typescript
+const { iterations } = await agent.getAutomodeLog({ limit: 10 });
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

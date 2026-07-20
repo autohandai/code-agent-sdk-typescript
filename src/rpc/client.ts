@@ -43,6 +43,8 @@ import type {
   AutomodeStatusResult,
   AutomodeOperationResult,
   AutomodeCancelParams,
+  AutomodeGetLogParams,
+  AutomodeGetLogResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -443,6 +445,18 @@ export class RPCClient {
       'autohand.automode.cancel',
       params
     ) as Promise<AutomodeOperationResult>;
+  }
+
+  /**
+   * Get typed auto-mode iteration log entries.
+   */
+  async getAutomodeLog(
+    params: AutomodeGetLogParams = {}
+  ): Promise<AutomodeGetLogResult> {
+    return this.transport.request(
+      'autohand.automode.getLog',
+      params
+    ) as Promise<AutomodeGetLogResult>;
   }
 
   /**
