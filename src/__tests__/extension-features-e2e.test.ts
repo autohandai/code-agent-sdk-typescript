@@ -776,4 +776,32 @@ describe('extension notification features', () => {
       method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
     }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
   });
+
+  it('streams typed pre-prompt hook events from the spawned CLI', async () => {
+    const notification = {
+      method: 'autohand.hook.prePrompt',
+      params: { instruction: 'Review this change', mentionedFiles: ['src/index.ts'], timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [notification, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'hook_pre_prompt', ...notification.params });
+  });
+
+  it('drops malformed pre-prompt hook events', async () => {
+    const malformed = {
+      method: 'autohand.hook.prePrompt',
+      params: { instruction: 'Review', mentionedFiles: [42], timestamp: 't1' },
+    };
+    const sentinel = {
+      method: 'autohand.error',
+      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
+    };
+    await expect(withSDK({
+      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
+    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+  });
 });

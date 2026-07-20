@@ -4,6 +4,7 @@ import type {
   AutomodeIterationEvent,
   HookPreToolEvent,
   HookPostToolEvent,
+  HookPrePromptEvent,
 } from '../types/index.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -112,6 +113,22 @@ export function parseHookPostToolEvent(value: unknown): HookPostToolEvent | unde
     success: value.success,
     duration: value.duration,
     ...(value.output !== undefined ? { output: value.output } : {}),
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI pre-prompt hook notification at the transport trust boundary. */
+export function parseHookPrePromptEvent(value: unknown): HookPrePromptEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.instruction !== 'string'
+    || !isStringArray(value.mentionedFiles)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_pre_prompt',
+    instruction: value.instruction,
+    mentionedFiles: value.mentionedFiles,
     timestamp: value.timestamp,
   };
 }
