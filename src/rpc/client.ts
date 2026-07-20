@@ -48,6 +48,8 @@ import type {
   PermissionDecision,
   PermissionAcknowledgedParams,
   PermissionAcknowledgedResult,
+  DirectoryAccessResponseParams,
+  DirectoryAccessResponseResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -489,6 +491,14 @@ export class RPCClient {
   ): Promise<PermissionAcknowledgedResult> {
     const result = await this.transport.request('autohand.permissionAcknowledged', params);
     return validateExtensionRpcResult('autohand.permissionAcknowledged', result);
+  }
+
+  /** Resolve a pending workspace-directory access request. */
+  async respondToDirectoryAccess(
+    params: DirectoryAccessResponseParams
+  ): Promise<DirectoryAccessResponseResult> {
+    const result = await this.transport.request('autohand.directoryAccessResponse', params);
+    return validateExtensionRpcResult('autohand.directoryAccessResponse', result);
   }
 
   /**

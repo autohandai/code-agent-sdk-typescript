@@ -1875,6 +1875,17 @@ export interface PermissionAcknowledgedResult {
   success: boolean;
 }
 
+/** Parameters for resolving a requested workspace-directory access. */
+export interface DirectoryAccessResponseParams {
+  requestId: string;
+  granted: boolean;
+}
+
+/** Result returned after resolving directory access. */
+export interface DirectoryAccessResponseResult {
+  success: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

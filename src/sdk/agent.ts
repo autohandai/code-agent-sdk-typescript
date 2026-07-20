@@ -7,6 +7,8 @@ import type {
   PermissionDecisionScope,
   PermissionAcknowledgedParams,
   PermissionAcknowledgedResult,
+  DirectoryAccessResponseParams,
+  DirectoryAccessResponseResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -700,5 +702,11 @@ export class Agent {
     params: PermissionAcknowledgedParams
   ): Promise<PermissionAcknowledgedResult> {
     return this.sdk.acknowledgePermission(params);
+  }
+
+  async respondToDirectoryAccess(
+    params: DirectoryAccessResponseParams
+  ): Promise<DirectoryAccessResponseResult> {
+    return this.sdk.respondToDirectoryAccess(params);
   }
 }

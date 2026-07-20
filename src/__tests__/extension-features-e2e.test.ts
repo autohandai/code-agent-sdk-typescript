@@ -110,4 +110,28 @@ describe('extension RPC features', () => {
       sdk.acknowledgePermission(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.permissionAcknowledged/);
   });
+
+  it('responds to directory access through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.directoryAccessResponse',
+      params: { requestId: 'directory-1', granted: true },
+      result: { success: true },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.respondToDirectoryAccess(fixture.params)
+    )).resolves.toEqual({ success: true });
+  });
+
+  it('rejects a malformed directory access response result', async () => {
+    const fixture = {
+      method: 'autohand.directoryAccessResponse',
+      params: { requestId: 'directory-1', granted: false },
+      result: { success: 1 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.respondToDirectoryAccess(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.directoryAccessResponse/);
+  });
 });
