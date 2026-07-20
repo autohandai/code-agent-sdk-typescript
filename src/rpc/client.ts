@@ -36,6 +36,8 @@ import type {
   GetMessagesResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
+  BrowserHandoffAttachParams,
+  BrowserHandoffAttachResult,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -362,6 +364,18 @@ export class RPCClient {
       'autohand.browserHandoff.create',
       params
     ) as Promise<BrowserHandoffCreateResult>;
+  }
+
+  /**
+   * Consume a browser handoff token and attach its session.
+   */
+  async attachBrowserHandoff(
+    params: BrowserHandoffAttachParams
+  ): Promise<BrowserHandoffAttachResult> {
+    return this.transport.request(
+      'autohand.browserHandoff.attach',
+      params
+    ) as Promise<BrowserHandoffAttachResult>;
   }
 
   /**

@@ -36,6 +36,8 @@ import type {
   GetMessagesResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
+  BrowserHandoffAttachParams,
+  BrowserHandoffAttachResult,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1419,6 +1421,16 @@ export class AutohandSDK {
   ): Promise<BrowserHandoffCreateResult> {
     await this.ensureStarted();
     return this.client.createBrowserHandoff(params);
+  }
+
+  /**
+   * Attach the session referenced by a one-time browser handoff token.
+   */
+  async attachBrowserHandoff(
+    params: BrowserHandoffAttachParams
+  ): Promise<BrowserHandoffAttachResult> {
+    await this.ensureStarted();
+    return this.client.attachBrowserHandoff(params);
   }
 
   // ============================================================================

@@ -62,4 +62,32 @@ describe('session control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.createBrowserHandoff(params)).resolves.toEqual(handoff);
   });
+
+  it('attaches a browser handoff token through every public layer', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const attached = {
+      success: true,
+      sessionId: 'session-attached',
+      workspaceRoot: '/workspace',
+      messageCount: 12,
+    };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return attached;
+    };
+
+    const params = { token: 'handoff-token' };
+    await expect(client.attachBrowserHandoff(params)).resolves.toEqual(attached);
+    expect(calls).toEqual([{
+      method: 'autohand.browserHandoff.attach',
+      params,
+    }]);
+
+    const sdk = {
+      attachBrowserHandoff: async () => attached,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.attachBrowserHandoff(params)).resolves.toEqual(attached);
+  });
 });

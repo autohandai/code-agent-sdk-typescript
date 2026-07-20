@@ -34,6 +34,8 @@ import type {
   GetSkillsRegistryResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
+  BrowserHandoffAttachParams,
+  BrowserHandoffAttachResult,
   InstallSkillParams,
   InstallSkillResult,
   McpListServersResult,
@@ -559,6 +561,12 @@ export class Agent {
     params: BrowserHandoffCreateParams = {}
   ): Promise<BrowserHandoffCreateResult> {
     return this.sdk.createBrowserHandoff(params);
+  }
+
+  async attachBrowserHandoff(
+    params: BrowserHandoffAttachParams
+  ): Promise<BrowserHandoffAttachResult> {
+    return this.sdk.attachBrowserHandoff(params);
   }
 
   async setPlanMode(enabled: boolean): Promise<void> {

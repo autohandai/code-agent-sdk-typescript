@@ -1853,6 +1853,10 @@ export interface BrowserHandoffCreateParams {
   installUrl?: string;
 }
 
+export interface BrowserHandoffAttachParams {
+  token: string;
+}
+
 export interface PermissionResponseParams {
   requestId: string;
   decision?: PermissionDecision | PermissionDecisionAlias;
@@ -1888,6 +1892,13 @@ export interface BrowserHandoffCreateResult {
   createdAt: string;
   expiresAt: string;
   url: string;
+}
+
+export interface BrowserHandoffAttachResult {
+  success: boolean;
+  sessionId?: string;
+  workspaceRoot?: string;
+  messageCount?: number;
 }
 
 export interface GetStateResult {

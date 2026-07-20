@@ -391,6 +391,14 @@ const handoff = await agent.createBrowserHandoff({
 console.log(handoff.url);
 ```
 
+#### `attachBrowserHandoff(params): Promise<BrowserHandoffAttachResult>`
+
+Consume a one-time handoff token and attach the referenced CLI session.
+
+```typescript
+const attached = await agent.attachBrowserHandoff({ token: handoff.token });
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.
