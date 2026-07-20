@@ -12,6 +12,8 @@ import type {
   LearnAuditEntry,
   LearnRecommendation,
   LearnRecommendResult,
+  LearnUpdateEntry,
+  LearnUpdateResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -316,6 +318,37 @@ function learnRecommendResult(
   return result;
 }
 
+function learnUpdateStatus(
+  value: unknown,
+  method: string,
+  path: string
+): LearnUpdateEntry['status'] {
+  if (value === 'updated' || value === 'unchanged' || value === 'failed') return value;
+  return invalid(method, path, 'updated | unchanged | failed', value);
+}
+
+function learnUpdateEntry(value: unknown, method: string, path: string): LearnUpdateEntry {
+  const record = object(value, method, path);
+  return {
+    name: string(record.name, method, `${path}.name`),
+    status: learnUpdateStatus(record.status, method, `${path}.status`),
+  };
+}
+
+function learnUpdateResult(value: unknown, method: string, path: string): LearnUpdateResult {
+  const record = object(value, method, path);
+  const result: LearnUpdateResult = {
+    success: boolean(record.success, method, `${path}.success`),
+    updated: number(record.updated, method, `${path}.updated`),
+    unchanged: number(record.unchanged, method, `${path}.unchanged`),
+    results: array(record.results, method, `${path}.results`, learnUpdateEntry),
+  };
+  if (record.error !== undefined) {
+    result.error = string(record.error, method, `${path}.error`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -329,6 +362,7 @@ interface ExtensionRpcResultMap {
   'autohand.mcp.setVscodeTools': McpSetVscodeToolsResult;
   'autohand.mcp.invokeResponse': McpInvokeResponseResult;
   'autohand.learn.recommend': LearnRecommendResult;
+  'autohand.learn.update': LearnUpdateResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -360,6 +394,8 @@ const validators: {
     mcpInvokeResponseResult(value, 'autohand.mcp.invokeResponse', path),
   'autohand.learn.recommend': (value, path) =>
     learnRecommendResult(value, 'autohand.learn.recommend', path),
+  'autohand.learn.update': (value, path) =>
+    learnUpdateResult(value, 'autohand.learn.update', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

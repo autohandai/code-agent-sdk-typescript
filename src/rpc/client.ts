@@ -68,6 +68,7 @@ import type {
   McpInvokeResponseResult,
   LearnRecommendParams,
   LearnRecommendResult,
+  LearnUpdateResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -588,6 +589,12 @@ export class RPCClient {
   ): Promise<LearnRecommendResult> {
     const result = await this.transport.request('autohand.learn.recommend', params);
     return validateExtensionRpcResult('autohand.learn.recommend', result);
+  }
+
+  /** Update installed project skills from their registry sources. */
+  async updateLearnedSkills(): Promise<LearnUpdateResult> {
+    const result = await this.transport.request('autohand.learn.update', {});
+    return validateExtensionRpcResult('autohand.learn.update', result);
   }
 
   /**

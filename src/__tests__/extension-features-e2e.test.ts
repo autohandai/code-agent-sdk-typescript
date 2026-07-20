@@ -463,4 +463,41 @@ describe('extension RPC features', () => {
       sdk.getLearningRecommendations(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.recommend/);
   });
+
+  it('updates learned project skills through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.learn.update',
+      params: {},
+      result: {
+        success: true,
+        updated: 1,
+        unchanged: 1,
+        results: [
+          { name: 'typescript', status: 'updated' as const },
+          { name: 'tdd', status: 'unchanged' as const },
+        ],
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.updateLearnedSkills()
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects an unknown learned-skill update status', async () => {
+    const fixture = {
+      method: 'autohand.learn.update',
+      params: {},
+      result: {
+        success: false,
+        updated: 0,
+        unchanged: 0,
+        results: [{ name: 'typescript', status: 'skipped' }],
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.updateLearnedSkills()
+    )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.update/);
+  });
 });

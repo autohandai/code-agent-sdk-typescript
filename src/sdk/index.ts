@@ -69,6 +69,7 @@ import type {
   McpInvokeResponseResult,
   LearnRecommendParams,
   LearnRecommendResult,
+  LearnUpdateResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1635,6 +1636,12 @@ export class AutohandSDK {
   ): Promise<LearnRecommendResult> {
     await this.ensureStarted();
     return this.client.getLearningRecommendations(params);
+  }
+
+  /** Update installed project skills from their registry sources. */
+  async updateLearnedSkills(): Promise<LearnUpdateResult> {
+    await this.ensureStarted();
+    return this.client.updateLearnedSkills();
   }
 
   /**

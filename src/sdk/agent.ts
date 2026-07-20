@@ -27,6 +27,7 @@ import type {
   McpInvokeResponseResult,
   LearnRecommendParams,
   LearnRecommendResult,
+  LearnUpdateResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -774,5 +775,9 @@ export class Agent {
     params: LearnRecommendParams = {}
   ): Promise<LearnRecommendResult> {
     return this.sdk.getLearningRecommendations(params);
+  }
+
+  async updateLearnedSkills(): Promise<LearnUpdateResult> {
+    return this.sdk.updateLearnedSkills();
   }
 }

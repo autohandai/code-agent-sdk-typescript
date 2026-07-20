@@ -2037,6 +2037,19 @@ export interface LearnRecommendResult {
   error?: string;
 }
 
+export interface LearnUpdateEntry {
+  name: string;
+  status: 'updated' | 'unchanged' | 'failed';
+}
+
+export interface LearnUpdateResult {
+  success: boolean;
+  updated: number;
+  unchanged: number;
+  results: LearnUpdateEntry[];
+  error?: string;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================
