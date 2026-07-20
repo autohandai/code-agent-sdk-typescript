@@ -31,6 +31,8 @@ import type {
   LearnGenerateParams,
   LearnGenerateResult,
   GetToolsRegistryResult,
+  SetContextCompactParams,
+  SetContextCompactResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -790,5 +792,11 @@ export class Agent {
 
   async getToolsRegistry(): Promise<GetToolsRegistryResult> {
     return this.sdk.getToolsRegistry();
+  }
+
+  async setContextCompact(
+    params: SetContextCompactParams
+  ): Promise<SetContextCompactResult> {
+    return this.sdk.setContextCompact(params);
   }
 }

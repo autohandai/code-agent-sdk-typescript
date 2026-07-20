@@ -570,4 +570,28 @@ describe('extension RPC features', () => {
       sdk.getToolsRegistry()
     )).rejects.toThrow(/Invalid RPC result for autohand\.getToolsRegistry/);
   });
+
+  it('controls context compaction through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.setContextCompact',
+      params: { enabled: true },
+      result: { enabled: true },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setContextCompact(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed context compaction result', async () => {
+    const fixture = {
+      method: 'autohand.setContextCompact',
+      params: { enabled: false },
+      result: { enabled: 0 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setContextCompact(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.setContextCompact/);
+  });
 });

@@ -17,6 +17,7 @@ import type {
   LearnGenerateResult,
   GetToolsRegistryResult,
   ToolRegistryEntry,
+  SetContextCompactResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -449,6 +450,15 @@ function getToolsRegistryResult(
   };
 }
 
+function setContextCompactResult(
+  value: unknown,
+  method: string,
+  path: string
+): SetContextCompactResult {
+  const record = object(value, method, path);
+  return { enabled: boolean(record.enabled, method, `${path}.enabled`) };
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -465,6 +475,7 @@ interface ExtensionRpcResultMap {
   'autohand.learn.update': LearnUpdateResult;
   'autohand.learn.generate': LearnGenerateResult;
   'autohand.getToolsRegistry': GetToolsRegistryResult;
+  'autohand.setContextCompact': SetContextCompactResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -502,6 +513,8 @@ const validators: {
     learnGenerateResult(value, 'autohand.learn.generate', path),
   'autohand.getToolsRegistry': (value, path) =>
     getToolsRegistryResult(value, 'autohand.getToolsRegistry', path),
+  'autohand.setContextCompact': (value, path) =>
+    setContextCompactResult(value, 'autohand.setContextCompact', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

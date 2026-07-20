@@ -2082,6 +2082,14 @@ export interface GetToolsRegistryResult {
   diagnostics: Array<{ file: string; reason: string }>;
 }
 
+export interface SetContextCompactParams {
+  enabled: boolean;
+}
+
+export interface SetContextCompactResult {
+  enabled: boolean;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

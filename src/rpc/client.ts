@@ -72,6 +72,8 @@ import type {
   LearnGenerateParams,
   LearnGenerateResult,
   GetToolsRegistryResult,
+  SetContextCompactParams,
+  SetContextCompactResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -610,6 +612,14 @@ export class RPCClient {
   async getToolsRegistry(): Promise<GetToolsRegistryResult> {
     const result = await this.transport.request('autohand.getToolsRegistry', {});
     return validateExtensionRpcResult('autohand.getToolsRegistry', result);
+  }
+
+  /** Enable or disable automatic context compaction. */
+  async setContextCompact(
+    params: SetContextCompactParams
+  ): Promise<SetContextCompactResult> {
+    const result = await this.transport.request('autohand.setContextCompact', params);
+    return validateExtensionRpcResult('autohand.setContextCompact', result);
   }
 
   /**

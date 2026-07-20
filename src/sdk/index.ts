@@ -73,6 +73,8 @@ import type {
   LearnGenerateParams,
   LearnGenerateResult,
   GetToolsRegistryResult,
+  SetContextCompactParams,
+  SetContextCompactResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1657,6 +1659,14 @@ export class AutohandSDK {
   async getToolsRegistry(): Promise<GetToolsRegistryResult> {
     await this.ensureStarted();
     return this.client.getToolsRegistry();
+  }
+
+  /** Enable or disable automatic context compaction. */
+  async setContextCompact(
+    params: SetContextCompactParams
+  ): Promise<SetContextCompactResult> {
+    await this.ensureStarted();
+    return this.client.setContextCompact(params);
   }
 
   /**
