@@ -1952,6 +1952,10 @@ export interface AutomodeOperationResult {
   error?: string;
 }
 
+export interface AutomodeCancelParams {
+  reason?: string;
+}
+
 export interface GetStateResult {
   status: 'idle' | 'processing' | 'waiting_permission';
   sessionId: string | null;

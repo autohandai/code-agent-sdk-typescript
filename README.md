@@ -446,6 +446,15 @@ Resume a paused auto-mode loop.
 const result = await agent.resumeAutomode();
 ```
 
+#### `cancelAutomode(params?): Promise<AutomodeOperationResult>`
+
+Request cancellation of the active auto-mode session. The optional reason is
+forwarded using CLI-3's current RPC contract.
+
+```typescript
+const result = await agent.cancelAutomode({ reason: 'release window closed' });
+```
+
 #### `getState(): Promise<GetStateResult>`
 
 Get the current agent state.

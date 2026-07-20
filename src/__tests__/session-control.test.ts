@@ -233,4 +233,27 @@ describe('auto-mode control RPCs', () => {
     const agent = Agent.fromSDK(sdk);
     await expect(agent.resumeAutomode()).resolves.toEqual(resumed);
   });
+
+  it('cancels auto-mode with the optional wire reason', async () => {
+    const client = new RPCClient();
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const cancelled = { success: true };
+    getTransport(client).request = async (method, params) => {
+      calls.push({ method, params });
+      return cancelled;
+    };
+    const params = { reason: 'release window closed' };
+
+    await expect(client.cancelAutomode(params)).resolves.toEqual(cancelled);
+    expect(calls).toEqual([{
+      method: 'autohand.automode.cancel',
+      params,
+    }]);
+
+    const sdk = {
+      cancelAutomode: async () => cancelled,
+    } as unknown as AutohandSDK;
+    const agent = Agent.fromSDK(sdk);
+    await expect(agent.cancelAutomode(params)).resolves.toEqual(cancelled);
+  });
 });

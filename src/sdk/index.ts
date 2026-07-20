@@ -42,6 +42,7 @@ import type {
   AutomodeStartResult,
   AutomodeStatusResult,
   AutomodeOperationResult,
+  AutomodeCancelParams,
   ResetResult,
   PermissionDecisionScope,
   PermissionResponseParams,
@@ -1475,6 +1476,16 @@ export class AutohandSDK {
   async resumeAutomode(): Promise<AutomodeOperationResult> {
     await this.ensureStarted();
     return this.client.resumeAutomode();
+  }
+
+  /**
+   * Cancel the active auto-mode session.
+   */
+  async cancelAutomode(
+    params: AutomodeCancelParams = {}
+  ): Promise<AutomodeOperationResult> {
+    await this.ensureStarted();
+    return this.client.cancelAutomode(params);
   }
 
   // ============================================================================

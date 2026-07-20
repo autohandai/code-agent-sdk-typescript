@@ -42,6 +42,7 @@ import type {
   AutomodeStartResult,
   AutomodeStatusResult,
   AutomodeOperationResult,
+  AutomodeCancelParams,
   PermissionDecision,
   PermissionResponseParams,
   SDKEvent,
@@ -429,6 +430,18 @@ export class RPCClient {
     return this.transport.request(
       'autohand.automode.resume',
       {}
+    ) as Promise<AutomodeOperationResult>;
+  }
+
+  /**
+   * Cancel the active auto-mode session.
+   */
+  async cancelAutomode(
+    params: AutomodeCancelParams = {}
+  ): Promise<AutomodeOperationResult> {
+    return this.transport.request(
+      'autohand.automode.cancel',
+      params
     ) as Promise<AutomodeOperationResult>;
   }
 
