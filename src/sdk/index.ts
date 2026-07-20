@@ -61,6 +61,8 @@ import type {
   GetSessionResult,
   SessionAttachParams,
   SessionAttachResult,
+  YoloSetParams,
+  YoloSetResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1591,6 +1593,18 @@ export class AutohandSDK {
   async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
     await this.ensureStarted();
     return this.client.attachSession(params);
+  }
+
+  /** Enable or disable timed unrestricted mode through the canonical RPC. */
+  async setYolo(params: YoloSetParams): Promise<YoloSetResult> {
+    await this.ensureStarted();
+    return this.client.setYolo(params);
+  }
+
+  /** Use the legacy dotted timed-YOLO method supported by older CLI builds. */
+  async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
+    await this.ensureStarted();
+    return this.client.setYoloCompat(params);
   }
 
   /**

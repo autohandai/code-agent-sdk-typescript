@@ -324,4 +324,40 @@ describe('extension RPC features', () => {
       sdk.attachSession(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.session\.attach/);
   });
+
+  it('sets timed YOLO mode through the canonical spawned-CLI method', async () => {
+    const fixture = {
+      method: 'autohand.yoloSet',
+      params: { pattern: '*', timeoutSeconds: 300 },
+      result: { success: true, expiresIn: 300 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setYolo(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('supports the compatibility YOLO method alias', async () => {
+    const fixture = {
+      method: 'autohand.yolo.set',
+      params: { pattern: 'bash:*', timeoutSeconds: 60 },
+      result: { success: true, expiresIn: 60 },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setYoloCompat(fixture.params)
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects a malformed timed YOLO result', async () => {
+    const fixture = {
+      method: 'autohand.yoloSet',
+      params: { pattern: '' },
+      result: { success: true, expiresIn: 'never' },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.setYolo(fixture.params)
+    )).rejects.toThrow(/Invalid RPC result for autohand\.yoloSet/);
+  });
 });

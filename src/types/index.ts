@@ -1972,6 +1972,16 @@ export interface SessionAttachResult {
   error?: string;
 }
 
+export interface YoloSetParams {
+  pattern: string;
+  timeoutSeconds?: number;
+}
+
+export interface YoloSetResult {
+  success: boolean;
+  expiresIn?: number;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

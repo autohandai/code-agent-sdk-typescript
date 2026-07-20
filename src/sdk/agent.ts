@@ -19,6 +19,8 @@ import type {
   GetSessionResult,
   SessionAttachParams,
   SessionAttachResult,
+  YoloSetParams,
+  YoloSetResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -740,5 +742,13 @@ export class Agent {
 
   async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
     return this.sdk.attachSession(params);
+  }
+
+  async setYolo(params: YoloSetParams): Promise<YoloSetResult> {
+    return this.sdk.setYolo(params);
+  }
+
+  async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
+    return this.sdk.setYoloCompat(params);
   }
 }

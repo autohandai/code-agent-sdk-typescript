@@ -60,6 +60,8 @@ import type {
   GetSessionResult,
   SessionAttachParams,
   SessionAttachResult,
+  YoloSetParams,
+  YoloSetResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -544,6 +546,18 @@ export class RPCClient {
   async attachSession(params: SessionAttachParams): Promise<SessionAttachResult> {
     const result = await this.transport.request('autohand.session.attach', params);
     return validateExtensionRpcResult('autohand.session.attach', result);
+  }
+
+  /** Enable or disable timed unrestricted mode through the canonical RPC. */
+  async setYolo(params: YoloSetParams): Promise<YoloSetResult> {
+    const result = await this.transport.request('autohand.yoloSet', params);
+    return validateExtensionRpcResult('autohand.yoloSet', result);
+  }
+
+  /** Use the legacy dotted timed-YOLO method supported by older CLI builds. */
+  async setYoloCompat(params: YoloSetParams): Promise<YoloSetResult> {
+    const result = await this.transport.request('autohand.yolo.set', params);
+    return validateExtensionRpcResult('autohand.yolo.set', result);
   }
 
   /**

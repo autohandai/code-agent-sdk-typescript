@@ -6,6 +6,7 @@ import type {
   GetSessionSuccessResult,
   RpcMessage,
   SessionAttachResult,
+  YoloSetResult,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -224,6 +225,17 @@ function sessionAttachResult(value: unknown, method: string, path: string): Sess
   return result;
 }
 
+function yoloSetResult(value: unknown, method: string, path: string): YoloSetResult {
+  const record = object(value, method, path);
+  const result: YoloSetResult = {
+    success: boolean(record.success, method, `${path}.success`),
+  };
+  if (record.expiresIn !== undefined) {
+    result.expiresIn = number(record.expiresIn, method, `${path}.expiresIn`);
+  }
+  return result;
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -232,6 +244,8 @@ interface ExtensionRpcResultMap {
   'autohand.getHistory': GetHistoryResult;
   'autohand.getSession': GetSessionResult;
   'autohand.session.attach': SessionAttachResult;
+  'autohand.yoloSet': YoloSetResult;
+  'autohand.yolo.set': YoloSetResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -253,6 +267,10 @@ const validators: {
     getSessionResult(value, 'autohand.getSession', path),
   'autohand.session.attach': (value, path) =>
     sessionAttachResult(value, 'autohand.session.attach', path),
+  'autohand.yoloSet': (value, path) =>
+    yoloSetResult(value, 'autohand.yoloSet', path),
+  'autohand.yolo.set': (value, path) =>
+    yoloSetResult(value, 'autohand.yolo.set', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(
