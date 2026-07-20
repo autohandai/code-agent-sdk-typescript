@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.0.3-alpha.25.af63d03 - 2026-07-20
+
+> Bleeding edge alpha build from main.
+
+Compare: https://github.com/autohandai/code-agent-sdk-typescript/compare/v1.0.3...v1.0.3-alpha.25.af63d03
+
+### Changes
+
+- feat: add learning progress events (af63d03)
+- feat: add MCP tools changed events (2036348)
+- feat: add MCP invocation request events (865852a)
+- feat: add post-response hook events (28c55d2)
+- feat: add pre-prompt hook events (d11b91e)
+- feat: add post-tool hook events (17234da)
+- feat: add pre-tool hook events (006920f)
+- feat: add auto-mode error events (0c2ca18)
+- feat: add auto-mode completion events (ae2b544)
+- feat: add auto-mode iteration events (1aff551)
+- feat: add context compaction control (9bcbb7e)
+- feat: add tools registry (2816202)
+- feat: add skill generation (cdeb63c)
+- feat: add project learning updates (db05707)
+- feat: add project learning recommendations (52fce3b)
+- feat: add MCP invocation responses (5f25a48)
+- feat: add VS Code MCP tool registration (4129e0e)
+- feat: add timed YOLO mode (262938a)
+- feat: add session attachment (4832e6f)
+- feat: add session details (2b724b1)
+- feat: add session history (f9a28d4)
+- feat: add multi-file change decisions (9f114af)
+- feat: add directory access acknowledgement (bb6beb8)
+- feat: add directory access responses (11f0252)
+- feat: add permission acknowledgement (c3f847e)
+- ci: release from detached tagged commits (b7477d0)
+- fix: validate session control RPC results (306c40e)
+- feat: add auto-mode iteration log (bad4d74)
+- feat: add auto-mode cancellation (205abe0)
+- feat: add auto-mode resume (0fa544c)
+- feat: add auto-mode pause (5abfa1a)
+- feat: add auto-mode status (aa7bb95)
+- feat: add auto-mode start (00bf7ec)
+- feat: add latest browser handoff attachment (ed61f23)
+- feat: add browser handoff attachment (be8e31a)
+- feat: add browser handoff creation (95aff87)
+- feat: add conversation reset (9e15384)
+- feat: harden transport and add discovery APIs (6a43c02)
+
 ## Unreleased
 
 ### Added
