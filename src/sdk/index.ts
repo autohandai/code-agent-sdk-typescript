@@ -72,6 +72,7 @@ import type {
   LearnUpdateResult,
   LearnGenerateParams,
   LearnGenerateResult,
+  GetToolsRegistryResult,
   PermissionResponseParams,
   SDKEvent,
   ModelInfo,
@@ -1650,6 +1651,12 @@ export class AutohandSDK {
   async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
     await this.ensureStarted();
     return this.client.generateSkill(params);
+  }
+
+  /** Return built-in, meta, and extension tool registry entries. */
+  async getToolsRegistry(): Promise<GetToolsRegistryResult> {
+    await this.ensureStarted();
+    return this.client.getToolsRegistry();
   }
 
   /**

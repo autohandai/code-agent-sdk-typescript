@@ -71,6 +71,7 @@ import type {
   LearnUpdateResult,
   LearnGenerateParams,
   LearnGenerateResult,
+  GetToolsRegistryResult,
   PermissionResponseParams,
   SDKEvent,
   JsonRpcParams,
@@ -603,6 +604,12 @@ export class RPCClient {
   async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
     const result = await this.transport.request('autohand.learn.generate', params);
     return validateExtensionRpcResult('autohand.learn.generate', result);
+  }
+
+  /** Return built-in, meta, and extension tool registry entries. */
+  async getToolsRegistry(): Promise<GetToolsRegistryResult> {
+    const result = await this.transport.request('autohand.getToolsRegistry', {});
+    return validateExtensionRpcResult('autohand.getToolsRegistry', result);
   }
 
   /**

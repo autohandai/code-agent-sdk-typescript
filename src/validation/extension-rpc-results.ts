@@ -15,6 +15,8 @@ import type {
   LearnUpdateEntry,
   LearnUpdateResult,
   LearnGenerateResult,
+  GetToolsRegistryResult,
+  ToolRegistryEntry,
   RpcHistoryEntry,
   DirectoryAccessResponseResult,
   DirectoryAccessAcknowledgedResult,
@@ -367,6 +369,86 @@ function learnGenerateResult(value: unknown, method: string, path: string): Lear
   return result;
 }
 
+function toolRegistrySource(
+  value: unknown,
+  method: string,
+  path: string
+): ToolRegistryEntry['source'] {
+  if (value === 'builtin' || value === 'meta' || value === 'extension') return value;
+  return invalid(method, path, 'builtin | meta | extension', value);
+}
+
+function toolRegistryScope(
+  value: unknown,
+  method: string,
+  path: string
+): NonNullable<ToolRegistryEntry['scope']> {
+  if (value === 'user' || value === 'project') return value;
+  return invalid(method, path, 'user | project', value);
+}
+
+function toolRegistryEntry(value: unknown, method: string, path: string): ToolRegistryEntry {
+  const record = object(value, method, path);
+  const entry: ToolRegistryEntry = {
+    name: string(record.name, method, `${path}.name`),
+    description: string(record.description, method, `${path}.description`),
+    source: toolRegistrySource(record.source, method, `${path}.source`),
+  };
+  const optionalStrings = [
+    'approvalMessage',
+    'createdAt',
+    'handlerPreview',
+    'reuseHint',
+    'extensionId',
+    'extensionVersion',
+  ] as const;
+  for (const key of optionalStrings) {
+    if (record[key] !== undefined) entry[key] = string(record[key], method, `${path}.${key}`);
+  }
+  if (record.requiresApproval !== undefined) {
+    entry.requiresApproval = boolean(record.requiresApproval, method, `${path}.requiresApproval`);
+  }
+  if (record.scope !== undefined) {
+    entry.scope = toolRegistryScope(record.scope, method, `${path}.scope`);
+  }
+  if (record.disabled !== undefined) {
+    entry.disabled = boolean(record.disabled, method, `${path}.disabled`);
+  }
+  if (record.schemaVersion !== undefined) {
+    entry.schemaVersion = number(record.schemaVersion, method, `${path}.schemaVersion`);
+  }
+  return entry;
+}
+
+function toolRegistryDiagnostic(
+  value: unknown,
+  method: string,
+  path: string
+): GetToolsRegistryResult['diagnostics'][number] {
+  const record = object(value, method, path);
+  return {
+    file: string(record.file, method, `${path}.file`),
+    reason: string(record.reason, method, `${path}.reason`),
+  };
+}
+
+function getToolsRegistryResult(
+  value: unknown,
+  method: string,
+  path: string
+): GetToolsRegistryResult {
+  const record = object(value, method, path);
+  return {
+    tools: array(record.tools, method, `${path}.tools`, toolRegistryEntry),
+    diagnostics: array(
+      record.diagnostics,
+      method,
+      `${path}.diagnostics`,
+      toolRegistryDiagnostic
+    ),
+  };
+}
+
 interface ExtensionRpcResultMap {
   'autohand.permissionAcknowledged': PermissionAcknowledgedResult;
   'autohand.directoryAccessResponse': DirectoryAccessResponseResult;
@@ -382,6 +464,7 @@ interface ExtensionRpcResultMap {
   'autohand.learn.recommend': LearnRecommendResult;
   'autohand.learn.update': LearnUpdateResult;
   'autohand.learn.generate': LearnGenerateResult;
+  'autohand.getToolsRegistry': GetToolsRegistryResult;
 }
 
 export type ExtensionRpcMethod = keyof ExtensionRpcResultMap;
@@ -417,6 +500,8 @@ const validators: {
     learnUpdateResult(value, 'autohand.learn.update', path),
   'autohand.learn.generate': (value, path) =>
     learnGenerateResult(value, 'autohand.learn.generate', path),
+  'autohand.getToolsRegistry': (value, path) =>
+    getToolsRegistryResult(value, 'autohand.getToolsRegistry', path),
 };
 
 export function validateExtensionRpcResult<Method extends ExtensionRpcMethod>(

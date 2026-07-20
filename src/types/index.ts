@@ -2061,6 +2061,27 @@ export interface LearnGenerateResult {
   error?: string;
 }
 
+export interface ToolRegistryEntry {
+  name: string;
+  description: string;
+  requiresApproval?: boolean;
+  approvalMessage?: string;
+  source: 'builtin' | 'meta' | 'extension';
+  scope?: 'user' | 'project';
+  disabled?: boolean;
+  createdAt?: string;
+  schemaVersion?: number;
+  handlerPreview?: string;
+  reuseHint?: string;
+  extensionId?: string;
+  extensionVersion?: string;
+}
+
+export interface GetToolsRegistryResult {
+  tools: ToolRegistryEntry[];
+  diagnostics: Array<{ file: string; reason: string }>;
+}
+
 // ============================================================================
 // RPC Response Results
 // ============================================================================

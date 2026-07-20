@@ -30,6 +30,7 @@ import type {
   LearnUpdateResult,
   LearnGenerateParams,
   LearnGenerateResult,
+  GetToolsRegistryResult,
   PermissionResponseParams,
   PromptParams,
   QueueGoalParams,
@@ -785,5 +786,9 @@ export class Agent {
 
   async generateSkill(params: LearnGenerateParams): Promise<LearnGenerateResult> {
     return this.sdk.generateSkill(params);
+  }
+
+  async getToolsRegistry(): Promise<GetToolsRegistryResult> {
+    return this.sdk.getToolsRegistry();
   }
 }

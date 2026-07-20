@@ -528,4 +528,46 @@ describe('extension RPC features', () => {
       sdk.generateSkill(fixture.params)
     )).rejects.toThrow(/Invalid RPC result for autohand\.learn\.generate/);
   });
+
+  it('gets the typed tools registry through the spawned CLI', async () => {
+    const fixture = {
+      method: 'autohand.getToolsRegistry',
+      params: {},
+      result: {
+        tools: [{
+          name: 'write_file',
+          description: 'Write a file',
+          requiresApproval: true,
+          approvalMessage: 'Allow writing?',
+          source: 'builtin' as const,
+          scope: 'project' as const,
+          disabled: false,
+          createdAt: '2026-07-20T00:00:00.000Z',
+          schemaVersion: 1,
+          handlerPreview: 'write(path, content)',
+          reuseHint: 'Use for complete file replacement',
+        }],
+        diagnostics: [{ file: 'tool.json', reason: 'duplicate ignored' }],
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getToolsRegistry()
+    )).resolves.toEqual(fixture.result);
+  });
+
+  it('rejects tools registry entries with an unknown source', async () => {
+    const fixture = {
+      method: 'autohand.getToolsRegistry',
+      params: {},
+      result: {
+        tools: [{ name: 'tool', description: 'Tool', source: 'remote' }],
+        diagnostics: [],
+      },
+    };
+
+    await expect(withSDK(fixture, (sdk) =>
+      sdk.getToolsRegistry()
+    )).rejects.toThrow(/Invalid RPC result for autohand\.getToolsRegistry/);
+  });
 });
