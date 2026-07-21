@@ -2347,6 +2347,17 @@ export type SDKEvent =
   | HookPostToolEvent
   | HookPrePromptEvent
   | HookPostResponseEvent
+  | HookSessionErrorEvent
+  | HookStopEvent
+  | HookSessionStartEvent
+  | HookSessionEndEvent
+  | HookSubagentStopEvent
+  | HookPermissionRequestEvent
+  | HookNotificationEvent
+  | HookContextCompactedEvent
+  | HookContextOverflowEvent
+  | HookContextWarningEvent
+  | HookContextCriticalEvent
   | McpInvokeRequestEvent
   | McpToolsChangedEvent
   | LearnProgressEvent
@@ -2415,9 +2426,102 @@ export interface HookPrePromptEvent {
 export interface HookPostResponseEvent {
   type: 'hook_post_response';
   tokensUsed: number;
-  tokensUsageStatus?: 'actual' | 'unavailable';
+  tokensUsageStatus?: HookTokenUsageStatus;
   toolCallsCount: number;
   duration: number;
+  timestamp: string;
+}
+
+export type HookTokenUsageStatus = 'actual' | 'unavailable';
+export type HookSessionStartType = 'startup' | 'resume' | 'clear';
+export type HookSessionEndReason = 'quit' | 'clear' | 'exit' | 'error';
+
+export interface HookSessionErrorEvent {
+  type: 'hook_session_error';
+  error: string;
+  code?: string;
+  context?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface HookStopEvent {
+  type: 'hook_stop';
+  tokensUsed: number;
+  tokensUsageStatus?: HookTokenUsageStatus;
+  toolCallsCount: number;
+  duration: number;
+  timestamp: string;
+}
+
+export interface HookSessionStartEvent {
+  type: 'hook_session_start';
+  sessionType: HookSessionStartType;
+  timestamp: string;
+}
+
+export interface HookSessionEndEvent {
+  type: 'hook_session_end';
+  reason: HookSessionEndReason;
+  duration: number;
+  timestamp: string;
+}
+
+export interface HookSubagentStopEvent {
+  type: 'hook_subagent_stop';
+  subagentId: string;
+  subagentName: string;
+  subagentType: string;
+  success: boolean;
+  duration: number;
+  error?: string;
+  timestamp: string;
+}
+
+export interface HookPermissionRequestEvent {
+  type: 'hook_permission_request';
+  tool: string;
+  path?: string;
+  command?: string;
+  args?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface HookNotificationEvent {
+  type: 'hook_notification';
+  notificationType: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface HookContextCompactedEvent {
+  type: 'hook_context_compacted';
+  croppedCount: number;
+  summary?: string;
+  usagePercent: number;
+  reason: string;
+  timestamp: string;
+}
+
+export interface HookContextOverflowEvent {
+  type: 'hook_context_overflow';
+  tokensBefore: number;
+  tokensAfter: number;
+  croppedCount: number;
+  usagePercent: number;
+  timestamp: string;
+}
+
+export interface HookContextWarningEvent {
+  type: 'hook_context_warning';
+  usagePercent: number;
+  remainingTokens: number;
+  timestamp: string;
+}
+
+export interface HookContextCriticalEvent {
+  type: 'hook_context_critical';
+  usagePercent: number;
+  remainingTokens: number;
   timestamp: string;
 }
 
@@ -2566,10 +2670,13 @@ export interface ToolEndEvent {
 export interface FileModifiedEvent {
   type: 'file_modified';
   filePath: string;
-  changeType: 'create' | 'modify' | 'delete';
+  changeType: HookFileChangeType;
   toolId: string;
   timestamp: string;
 }
+
+export type HookFileChangeType = 'create' | 'modify' | 'delete';
+export type HookFileModifiedEvent = FileModifiedEvent;
 
 export interface PermissionRequestEvent {
   type: 'permission_request';

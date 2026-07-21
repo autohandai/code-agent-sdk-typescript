@@ -735,18 +735,16 @@ describe('extension notification features', () => {
     }, nextNotification)).resolves.toEqual({ type: 'hook_pre_tool', ...notification.params });
   });
 
-  it('drops malformed pre-tool hook events', async () => {
+  it('preserves malformed pre-tool hook events through the raw fallback', async () => {
     const malformed = {
       method: 'autohand.hook.preTool',
       params: { toolId: 'tool-1', toolName: 'write_file', args: 'a.ts', timestamp: 't1' },
     };
-    const sentinel = {
-      method: 'autohand.error',
-      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
-    };
     await expect(withSDK({
-      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
-    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+      method: 'unused', params: {}, result: {}, notifications: [malformed],
+    }, nextNotification)).resolves.toEqual({
+      type: 'unknown_notification', method: malformed.method, params: malformed.params,
+    });
   });
 
   it('streams typed post-tool hook events from the spawned CLI', async () => {
@@ -763,18 +761,16 @@ describe('extension notification features', () => {
     }, nextNotification)).resolves.toEqual({ type: 'hook_post_tool', ...notification.params });
   });
 
-  it('drops malformed post-tool hook events', async () => {
+  it('preserves malformed post-tool hook events through the raw fallback', async () => {
     const malformed = {
       method: 'autohand.hook.postTool',
       params: { toolId: 'tool-1', toolName: 'write_file', success: true, duration: 'fast', timestamp: 't1' },
     };
-    const sentinel = {
-      method: 'autohand.error',
-      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
-    };
     await expect(withSDK({
-      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
-    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+      method: 'unused', params: {}, result: {}, notifications: [malformed],
+    }, nextNotification)).resolves.toEqual({
+      type: 'unknown_notification', method: malformed.method, params: malformed.params,
+    });
   });
 
   it('streams typed pre-prompt hook events from the spawned CLI', async () => {
@@ -791,18 +787,16 @@ describe('extension notification features', () => {
     }, nextNotification)).resolves.toEqual({ type: 'hook_pre_prompt', ...notification.params });
   });
 
-  it('drops malformed pre-prompt hook events', async () => {
+  it('preserves malformed pre-prompt hook events through the raw fallback', async () => {
     const malformed = {
       method: 'autohand.hook.prePrompt',
       params: { instruction: 'Review', mentionedFiles: [42], timestamp: 't1' },
     };
-    const sentinel = {
-      method: 'autohand.error',
-      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
-    };
     await expect(withSDK({
-      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
-    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+      method: 'unused', params: {}, result: {}, notifications: [malformed],
+    }, nextNotification)).resolves.toEqual({
+      type: 'unknown_notification', method: malformed.method, params: malformed.params,
+    });
   });
 
   it('streams typed post-response hook events from the spawned CLI', async () => {
@@ -819,19 +813,136 @@ describe('extension notification features', () => {
     }, nextNotification)).resolves.toEqual({ type: 'hook_post_response', ...notification.params });
   });
 
-  it('drops malformed post-response hook events', async () => {
+  it('preserves malformed post-response hook events through the raw fallback', async () => {
     const malformed = {
       method: 'autohand.hook.postResponse',
       params: { tokensUsed: 900, tokensUsageStatus: 'estimated', toolCallsCount: 2, duration: 1250, timestamp: 't1' },
     };
-    const sentinel = {
-      method: 'autohand.error',
-      params: { code: 500, message: 'sentinel', recoverable: true, timestamp: 'sentinel' },
-    };
     await expect(withSDK({
-      method: 'unused', params: {}, result: {}, notifications: [malformed, sentinel],
-    }, nextNotification)).resolves.toEqual({ type: 'error', ...sentinel.params });
+      method: 'unused', params: {}, result: {}, notifications: [malformed],
+    }, nextNotification)).resolves.toEqual({
+      type: 'unknown_notification', method: malformed.method, params: malformed.params,
+    });
   });
+
+  const additionalHookCases = [
+    {
+      name: 'file-modified', method: 'autohand.hook.fileModified', type: 'file_modified',
+      params: { filePath: 'src/index.ts', changeType: 'modify', toolId: 'tool-1', timestamp: 't1' },
+      malformed: { filePath: 'src/index.ts', changeType: 'rename', toolId: 'tool-1', timestamp: 't1' },
+    },
+    {
+      name: 'session-error', method: 'autohand.hook.sessionError', type: 'hook_session_error',
+      params: { error: 'provider failed', code: 'PROVIDER_ERROR', context: { retryable: true }, timestamp: 't1' },
+      malformed: { error: { message: 'provider failed' }, timestamp: 't1' },
+    },
+    {
+      name: 'stop', method: 'autohand.hook.stop', type: 'hook_stop',
+      params: { tokensUsed: 42, tokensUsageStatus: 'actual', toolCallsCount: 2, duration: 125, timestamp: 't1' },
+      malformed: { tokensUsed: '42', tokensUsageStatus: 'actual', toolCallsCount: 2, duration: 125, timestamp: 't1' },
+    },
+    {
+      name: 'session-start', method: 'autohand.hook.sessionStart', type: 'hook_session_start',
+      params: { sessionType: 'resume', timestamp: 't1' },
+      malformed: { sessionType: 'fork', timestamp: 't1' },
+    },
+    {
+      name: 'session-end', method: 'autohand.hook.sessionEnd', type: 'hook_session_end',
+      params: { reason: 'quit', duration: 250, timestamp: 't1' },
+      malformed: { reason: 'timeout', duration: 250, timestamp: 't1' },
+    },
+    {
+      name: 'subagent-stop', method: 'autohand.hook.subagentStop', type: 'hook_subagent_stop',
+      params: { subagentId: 'sub-1', subagentName: 'reviewer', subagentType: 'worker', success: true, duration: 75, error: 'none', timestamp: 't1' },
+      malformed: { subagentId: 'sub-1', subagentName: 'reviewer', subagentType: 'worker', success: 'yes', duration: 75, timestamp: 't1' },
+    },
+    {
+      name: 'permission-request', method: 'autohand.hook.permissionRequest', type: 'hook_permission_request',
+      params: { tool: 'write_file', path: 'src/index.ts', command: 'write', args: { force: false }, timestamp: 't1' },
+      malformed: { tool: 'write_file', args: 'force', timestamp: 't1' },
+    },
+    {
+      name: 'notification', method: 'autohand.hook.notification', type: 'hook_notification',
+      params: { notificationType: 'info', message: 'Finished', timestamp: 't1' },
+      malformed: { notificationType: 7, message: 'Finished', timestamp: 't1' },
+    },
+    {
+      name: 'context-compacted', method: 'autohand.hook.contextCompacted', type: 'hook_context_compacted',
+      params: { croppedCount: 3, summary: 'Earlier turns', usagePercent: 0.6125, reason: 'threshold', timestamp: 't1' },
+      malformed: { croppedCount: '3', usagePercent: 0.6125, reason: 'threshold', timestamp: 't1' },
+    },
+    {
+      name: 'context-overflow', method: 'autohand.hook.contextOverflow', type: 'hook_context_overflow',
+      params: { tokensBefore: 12000, tokensAfter: 8000, croppedCount: 4, usagePercent: 1.05, timestamp: 't1' },
+      malformed: { tokensBefore: '12000', tokensAfter: 8000, croppedCount: 4, usagePercent: 1.05, timestamp: 't1' },
+    },
+    {
+      name: 'context-warning', method: 'autohand.hook.contextWarning', type: 'hook_context_warning',
+      params: { usagePercent: 0.805, remainingTokens: 4096, timestamp: 't1' },
+      malformed: { usagePercent: -0.1, remainingTokens: 4096, timestamp: 't1' },
+    },
+    {
+      name: 'context-critical', method: 'autohand.hook.contextCritical', type: 'hook_context_critical',
+      params: { usagePercent: 0.9575, remainingTokens: 1024, timestamp: 't1' },
+      malformed: { usagePercent: 0.9575, remainingTokens: '1024', timestamp: 't1' },
+    },
+  ] as const;
+
+  for (const hookCase of additionalHookCases) {
+    it(`streams typed ${hookCase.name} hook events from the spawned CLI`, async () => {
+      await expect(withSDK({
+        method: 'unused', params: {}, result: {},
+        notifications: [{ method: hookCase.method, params: hookCase.params }],
+      }, nextNotification)).resolves.toEqual({ type: hookCase.type, ...hookCase.params });
+    });
+
+    it(`preserves malformed ${hookCase.name} hook events through the raw fallback`, async () => {
+      await expect(withSDK({
+        method: 'unused', params: {}, result: {},
+        notifications: [{ method: hookCase.method, params: hookCase.malformed }],
+      }, nextNotification)).resolves.toEqual({
+        type: 'unknown_notification', method: hookCase.method, params: hookCase.malformed,
+      });
+    });
+  }
+
+  const fractionalContextCounterCases = [
+    {
+      method: 'autohand.hook.contextCompacted',
+      params: { croppedCount: 0.5, usagePercent: 0.6125, reason: 'threshold', timestamp: 't1' },
+    },
+    {
+      method: 'autohand.hook.contextOverflow',
+      params: { tokensBefore: 12000.5, tokensAfter: 8000, croppedCount: 4, usagePercent: 1.05, timestamp: 't1' },
+    },
+    {
+      method: 'autohand.hook.contextOverflow',
+      params: { tokensBefore: 12000, tokensAfter: 8000.5, croppedCount: 4, usagePercent: 1.05, timestamp: 't1' },
+    },
+    {
+      method: 'autohand.hook.contextOverflow',
+      params: { tokensBefore: 12000, tokensAfter: 8000, croppedCount: 4.5, usagePercent: 1.05, timestamp: 't1' },
+    },
+    {
+      method: 'autohand.hook.contextWarning',
+      params: { usagePercent: 0.805, remainingTokens: 4096.5, timestamp: 't1' },
+    },
+    {
+      method: 'autohand.hook.contextCritical',
+      params: { usagePercent: 0.9575, remainingTokens: 1024.5, timestamp: 't1' },
+    },
+  ] as const;
+
+  for (const hookCase of fractionalContextCounterCases) {
+    it(`preserves fractional counters from ${hookCase.method} through the raw fallback`, async () => {
+      await expect(withSDK({
+        method: 'unused', params: {}, result: {},
+        notifications: [{ method: hookCase.method, params: hookCase.params }],
+      }, nextNotification)).resolves.toEqual({
+        type: 'unknown_notification', method: hookCase.method, params: hookCase.params,
+      });
+    });
+  }
 
   it('streams typed MCP invocation request events from the spawned CLI', async () => {
     const notification = {

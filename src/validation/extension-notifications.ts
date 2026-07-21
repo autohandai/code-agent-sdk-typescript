@@ -6,6 +6,18 @@ import type {
   HookPostToolEvent,
   HookPrePromptEvent,
   HookPostResponseEvent,
+  FileModifiedEvent,
+  HookSessionErrorEvent,
+  HookStopEvent,
+  HookSessionStartEvent,
+  HookSessionEndEvent,
+  HookSubagentStopEvent,
+  HookPermissionRequestEvent,
+  HookNotificationEvent,
+  HookContextCompactedEvent,
+  HookContextOverflowEvent,
+  HookContextWarningEvent,
+  HookContextCriticalEvent,
   McpInvokeRequestEvent,
   McpToolSummary,
   McpToolsChangedEvent,
@@ -19,6 +31,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNonNegativeFiniteNumber(value) && Number.isInteger(value);
+}
+
+function isHookTokenUsageStatus(value: unknown): value is 'actual' | 'unavailable' {
+  return value === 'actual' || value === 'unavailable';
 }
 
 /** Parse a CLI auto-mode iteration notification at the transport trust boundary. */
@@ -164,6 +192,240 @@ export function parseHookPostResponseEvent(value: unknown): HookPostResponseEven
     duration: value.duration,
     timestamp: value.timestamp,
   };
+}
+
+/** Parse a CLI file-modified hook notification at the transport trust boundary. */
+export function parseHookFileModifiedEvent(value: unknown): FileModifiedEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.filePath !== 'string'
+    || (value.changeType !== 'create'
+      && value.changeType !== 'modify'
+      && value.changeType !== 'delete')
+    || typeof value.toolId !== 'string'
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'file_modified',
+    filePath: value.filePath,
+    changeType: value.changeType,
+    toolId: value.toolId,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI session-error hook notification at the transport trust boundary. */
+export function parseHookSessionErrorEvent(value: unknown): HookSessionErrorEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.error !== 'string'
+    || (value.code !== undefined && typeof value.code !== 'string')
+    || (value.context !== undefined && !isRecord(value.context))
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_session_error',
+    error: value.error,
+    ...(value.code !== undefined ? { code: value.code } : {}),
+    ...(value.context !== undefined ? { context: value.context } : {}),
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI stop hook notification at the transport trust boundary. */
+export function parseHookStopEvent(value: unknown): HookStopEvent | undefined {
+  if (!isRecord(value)
+    || !isFiniteNumber(value.tokensUsed)
+    || (value.tokensUsageStatus !== undefined
+      && !isHookTokenUsageStatus(value.tokensUsageStatus))
+    || !isFiniteNumber(value.toolCallsCount)
+    || !isFiniteNumber(value.duration)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_stop',
+    tokensUsed: value.tokensUsed,
+    ...(value.tokensUsageStatus !== undefined
+      ? { tokensUsageStatus: value.tokensUsageStatus }
+      : {}),
+    toolCallsCount: value.toolCallsCount,
+    duration: value.duration,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI session-start hook notification at the transport trust boundary. */
+export function parseHookSessionStartEvent(value: unknown): HookSessionStartEvent | undefined {
+  if (!isRecord(value)
+    || (value.sessionType !== 'startup'
+      && value.sessionType !== 'resume'
+      && value.sessionType !== 'clear')
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return { type: 'hook_session_start', sessionType: value.sessionType, timestamp: value.timestamp };
+}
+
+/** Parse a CLI session-end hook notification at the transport trust boundary. */
+export function parseHookSessionEndEvent(value: unknown): HookSessionEndEvent | undefined {
+  if (!isRecord(value)
+    || (value.reason !== 'quit'
+      && value.reason !== 'clear'
+      && value.reason !== 'exit'
+      && value.reason !== 'error')
+    || !isFiniteNumber(value.duration)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_session_end',
+    reason: value.reason,
+    duration: value.duration,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI subagent-stop hook notification at the transport trust boundary. */
+export function parseHookSubagentStopEvent(value: unknown): HookSubagentStopEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.subagentId !== 'string'
+    || typeof value.subagentName !== 'string'
+    || typeof value.subagentType !== 'string'
+    || typeof value.success !== 'boolean'
+    || !isFiniteNumber(value.duration)
+    || (value.error !== undefined && typeof value.error !== 'string')
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_subagent_stop',
+    subagentId: value.subagentId,
+    subagentName: value.subagentName,
+    subagentType: value.subagentType,
+    success: value.success,
+    duration: value.duration,
+    ...(value.error !== undefined ? { error: value.error } : {}),
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI permission-request hook notification at the transport trust boundary. */
+export function parseHookPermissionRequestEvent(
+  value: unknown
+): HookPermissionRequestEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.tool !== 'string'
+    || (value.path !== undefined && typeof value.path !== 'string')
+    || (value.command !== undefined && typeof value.command !== 'string')
+    || (value.args !== undefined && !isRecord(value.args))
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_permission_request',
+    tool: value.tool,
+    ...(value.path !== undefined ? { path: value.path } : {}),
+    ...(value.command !== undefined ? { command: value.command } : {}),
+    ...(value.args !== undefined ? { args: value.args } : {}),
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI user-notification hook at the transport trust boundary. */
+export function parseHookNotificationEvent(value: unknown): HookNotificationEvent | undefined {
+  if (!isRecord(value)
+    || typeof value.notificationType !== 'string'
+    || typeof value.message !== 'string'
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_notification',
+    notificationType: value.notificationType,
+    message: value.message,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI context-compacted hook notification at the transport trust boundary. */
+export function parseHookContextCompactedEvent(
+  value: unknown
+): HookContextCompactedEvent | undefined {
+  if (!isRecord(value)
+    || !isNonNegativeInteger(value.croppedCount)
+    || (value.summary !== undefined && typeof value.summary !== 'string')
+    || !isNonNegativeFiniteNumber(value.usagePercent)
+    || typeof value.reason !== 'string'
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_context_compacted',
+    croppedCount: value.croppedCount,
+    ...(value.summary !== undefined ? { summary: value.summary } : {}),
+    usagePercent: value.usagePercent,
+    reason: value.reason,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI context-overflow hook notification at the transport trust boundary. */
+export function parseHookContextOverflowEvent(
+  value: unknown
+): HookContextOverflowEvent | undefined {
+  if (!isRecord(value)
+    || !isNonNegativeInteger(value.tokensBefore)
+    || !isNonNegativeInteger(value.tokensAfter)
+    || !isNonNegativeInteger(value.croppedCount)
+    || !isNonNegativeFiniteNumber(value.usagePercent)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type: 'hook_context_overflow',
+    tokensBefore: value.tokensBefore,
+    tokensAfter: value.tokensAfter,
+    croppedCount: value.croppedCount,
+    usagePercent: value.usagePercent,
+    timestamp: value.timestamp,
+  };
+}
+
+function parseHookContextPressureEvent(
+  value: unknown,
+  type: 'hook_context_warning'
+): HookContextWarningEvent | undefined;
+function parseHookContextPressureEvent(
+  value: unknown,
+  type: 'hook_context_critical'
+): HookContextCriticalEvent | undefined;
+function parseHookContextPressureEvent(
+  value: unknown,
+  type: 'hook_context_warning' | 'hook_context_critical'
+): HookContextWarningEvent | HookContextCriticalEvent | undefined {
+  if (!isRecord(value)
+    || !isNonNegativeFiniteNumber(value.usagePercent)
+    || !isNonNegativeInteger(value.remainingTokens)
+    || typeof value.timestamp !== 'string') {
+    return undefined;
+  }
+  return {
+    type,
+    usagePercent: value.usagePercent,
+    remainingTokens: value.remainingTokens,
+    timestamp: value.timestamp,
+  };
+}
+
+/** Parse a CLI context-warning hook notification at the transport trust boundary. */
+export function parseHookContextWarningEvent(value: unknown): HookContextWarningEvent | undefined {
+  return parseHookContextPressureEvent(value, 'hook_context_warning');
+}
+
+/** Parse a CLI context-critical hook notification at the transport trust boundary. */
+export function parseHookContextCriticalEvent(value: unknown): HookContextCriticalEvent | undefined {
+  return parseHookContextPressureEvent(value, 'hook_context_critical');
 }
 
 /** Parse a CLI MCP invocation request at the transport trust boundary. */

@@ -131,8 +131,20 @@ import {
   parseAutomodeIterationEvent,
   parseHookPreToolEvent,
   parseHookPostToolEvent,
+  parseHookFileModifiedEvent,
   parseHookPrePromptEvent,
   parseHookPostResponseEvent,
+  parseHookSessionErrorEvent,
+  parseHookStopEvent,
+  parseHookSessionStartEvent,
+  parseHookSessionEndEvent,
+  parseHookSubagentStopEvent,
+  parseHookPermissionRequestEvent,
+  parseHookNotificationEvent,
+  parseHookContextCompactedEvent,
+  parseHookContextOverflowEvent,
+  parseHookContextWarningEvent,
+  parseHookContextCriticalEvent,
   parseMcpInvokeRequestEvent,
   parseMcpToolsChangedEvent,
   parseLearnProgressEvent,
@@ -1071,12 +1083,6 @@ export class RPCClient {
       this.queueEvent(event);
     });
 
-    // File modifications
-    this.transport.onNotification('autohand.hook.fileModified', (params) => {
-      const p = params as { filePath: string; changeType: 'create' | 'modify' | 'delete'; toolId: string; timestamp: string };
-      this.queueEvent({ type: 'file_modified', filePath: p.filePath, changeType: p.changeType, toolId: p.toolId, timestamp: p.timestamp });
-    });
-
     // Permission requests
     this.transport.onNotification('autohand.permissionRequest', (params) => {
       const p = params as { requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; options?: string[]; timestamp: string };
@@ -1100,25 +1106,33 @@ export class RPCClient {
       if (event !== undefined) this.queueEvent(event);
     });
 
-    this.transport.onNotification('autohand.hook.preTool', (params) => {
-      const event = parseHookPreToolEvent(params);
-      if (event !== undefined) this.queueEvent(event);
-    });
-
-    this.transport.onNotification('autohand.hook.postTool', (params) => {
-      const event = parseHookPostToolEvent(params);
-      if (event !== undefined) this.queueEvent(event);
-    });
-
-    this.transport.onNotification('autohand.hook.prePrompt', (params) => {
-      const event = parseHookPrePromptEvent(params);
-      if (event !== undefined) this.queueEvent(event);
-    });
-
-    this.transport.onNotification('autohand.hook.postResponse', (params) => {
-      const event = parseHookPostResponseEvent(params);
-      if (event !== undefined) this.queueEvent(event);
-    });
+    const hookNotificationParsers: ReadonlyArray<readonly [
+      method: string,
+      parser: (params: unknown) => SDKEvent | undefined,
+    ]> = [
+      ['autohand.hook.preTool', parseHookPreToolEvent],
+      ['autohand.hook.postTool', parseHookPostToolEvent],
+      ['autohand.hook.fileModified', parseHookFileModifiedEvent],
+      ['autohand.hook.prePrompt', parseHookPrePromptEvent],
+      ['autohand.hook.postResponse', parseHookPostResponseEvent],
+      ['autohand.hook.sessionError', parseHookSessionErrorEvent],
+      ['autohand.hook.stop', parseHookStopEvent],
+      ['autohand.hook.sessionStart', parseHookSessionStartEvent],
+      ['autohand.hook.sessionEnd', parseHookSessionEndEvent],
+      ['autohand.hook.subagentStop', parseHookSubagentStopEvent],
+      ['autohand.hook.permissionRequest', parseHookPermissionRequestEvent],
+      ['autohand.hook.notification', parseHookNotificationEvent],
+      ['autohand.hook.contextCompacted', parseHookContextCompactedEvent],
+      ['autohand.hook.contextOverflow', parseHookContextOverflowEvent],
+      ['autohand.hook.contextWarning', parseHookContextWarningEvent],
+      ['autohand.hook.contextCritical', parseHookContextCriticalEvent],
+    ];
+    for (const [method, parser] of hookNotificationParsers) {
+      this.transport.onNotification(method, (params) => {
+        const event = parser(params);
+        this.queueEvent(event ?? { type: 'unknown_notification', method, params });
+      });
+    }
 
     this.transport.onNotification('autohand.mcp.invokeRequest', (params) => {
       const event = parseMcpInvokeRequestEvent(params);
