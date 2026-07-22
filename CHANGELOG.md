@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.4-alpha.28.8f6b558 - 2026-07-22
+
+> Bleeding edge alpha build from main.
+
+Compare: https://github.com/autohandai/code-agent-sdk-typescript/compare/v1.0.4...v1.0.4-alpha.28.8f6b558
+
+### Changes
+
+- feat: add complete CLI hook event parity (8f6b558)
+
 ## Unreleased
 
 ### Added
