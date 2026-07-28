@@ -7,9 +7,19 @@
 - Added typed skill registry discovery and installation APIs.
 - Added typed MCP server, tool, and persisted-configuration inspection APIs.
 - Added a reproducible p95 startup benchmark with a strict 50 ms budget.
+- Added typed concurrent-session configuration, peer snapshots, ordered lifecycle
+  events, and recoverable registry-error events.
+- Added a session-awareness guide and runnable coordinate-tier example.
+- Added ten executable session-awareness integration examples with spawned-CLI
+  end-to-end coverage, including sub-agent and team workflows.
+- Added a read-only Autohand, Cursor Agent, and Pi comparison harness with
+  normalized commands, timing, output, availability, timeout, and vendor-error
+  reporting.
 
 ### Fixed
 
+- Refreshed every bundled CLI target with concurrent-session publishing, warnings,
+  collision detection, repository-drift reporting, and coordinate-tier claims.
 - Removed the 500 ms startup delay and made process startup, shutdown, and retries race-safe.
 - Reject pending requests immediately on child exit, write failure, timeout, or stdout closure.
 - Forward the documented generic `env` option and retain bounded stderr diagnostics.

@@ -35,6 +35,16 @@ describe('SDK release workflow', () => {
     expect(publishGitHubIndex > publishNpmIndex).toBe(true);
   });
 
+  it('uses curated release notes for initial and recovery releases', () => {
+    const workflow = readRepositoryFile('.github/workflows/release.yml');
+    const generateNotes = readWorkflowStep(workflow, 'Generate release notes');
+
+    expect(generateNotes).toContain('if [ -f "$curated_release_notes" ]; then');
+    expect(generateNotes.includes(
+      'if [ "$publish_existing" = "true" ] && [ -f "$curated_release_notes" ]; then',
+    )).toBe(false);
+  });
+
   it('keeps notes-only and already-published recovery paths free of duplicate npm publishes', () => {
     const workflow = readRepositoryFile('.github/workflows/release.yml');
 
@@ -87,14 +97,17 @@ describe('SDK release workflow', () => {
     expect(publishingGuide).toContain('provenance identifies the workflow trigger');
   });
 
-  it('stores curated notes for v1.0.2 and v1.0.3', () => {
+  it('stores curated notes for stable SDK releases', () => {
     const version102 = readRepositoryFile('docs/releases/v1.0.2.md');
     const version103 = readRepositoryFile('docs/releases/v1.0.3.md');
+    const version105 = readRepositoryFile('docs/releases/v1.0.5.md');
 
     expect(version102).toContain('# Autohand Agent SDK v1.0.2');
     expect(version102).toContain('Replayable autoresearch');
     expect(version103).toContain('# Autohand Agent SDK v1.0.3');
     expect(version103).toContain('autoresearch ledger');
+    expect(version105).toContain('# Autohand Agent SDK v1.0.5');
+    expect(version105).toContain('concurrent-session awareness');
   });
 
   it('declares the startup benchmark in the published file manifest', () => {

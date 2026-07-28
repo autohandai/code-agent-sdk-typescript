@@ -123,6 +123,21 @@ const sdk = new AutohandSDK({
 });
 ```
 
+## Concurrent Session Awareness
+
+```typescript
+const sdk = new AutohandSDK({
+  cwd: '.',
+  sessions: {
+    awareness: 'warn', // passive | warn | coordinate
+  },
+});
+```
+
+`warn` is the CLI default. An explicit SDK value is applied before CLI startup
+through a private config overlay; the user's config file is not changed. See
+[Concurrent Session Awareness](./session-awareness.md).
+
 ## System Prompts
 
 ```typescript

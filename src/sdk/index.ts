@@ -28,6 +28,7 @@
 
 import { RPCClient } from '../rpc/client.js';
 import type {
+  ActiveAgentRecord,
   SDKConfig,
   PromptParams,
   GetStateParams,
@@ -1424,6 +1425,13 @@ export class AutohandSDK {
   async getState(params?: GetStateParams): Promise<GetStateResult> {
     await this.ensureStarted();
     return this.client.getState(params);
+  }
+
+  /**
+   * Return live Autohand sessions sharing this SDK's workspace.
+   */
+  async getSessionPeers(): Promise<ActiveAgentRecord[]> {
+    return this.client.getSessionPeers();
   }
 
   /**

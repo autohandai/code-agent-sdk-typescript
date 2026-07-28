@@ -9,10 +9,27 @@ import { join } from 'path';
 
 const examplesDir = join(__dirname);
 
-// Get all TypeScript example files
-const exampleFiles = readdirSync(examplesDir)
-  .filter(file => file.endsWith('.ts') && !file.startsWith('test-') && file !== 'sdk-control-features.ts')
-  .sort();
+function collectExampleFiles(directory: string, prefix = ''): string[] {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const relativePath = join(prefix, entry.name);
+      if (entry.isDirectory()) {
+        return collectExampleFiles(join(directory, entry.name), relativePath);
+      }
+      if (
+        !entry.name.endsWith('.ts')
+        || entry.name.startsWith('test-')
+        || entry.name === 'sdk-control-features.ts'
+      ) {
+        return [];
+      }
+      return [relativePath];
+    });
+}
+
+// Get all TypeScript example files, including focused example collections.
+const exampleFiles = collectExampleFiles(examplesDir);
 
 console.log('=== Validating Adapted Examples ===\n');
 console.log(`Found ${exampleFiles.length} example files\n`);

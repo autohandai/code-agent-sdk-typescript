@@ -287,14 +287,13 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           tag="${{ steps.version.outputs.tag }}"
           release_notes_previous_tag="${{ steps.version.outputs.release_notes_previous_tag }}"
-          publish_existing="${{ steps.version.outputs.publish_existing }}"
           prerelease="${{ steps.version.outputs.prerelease }}"
           date="$(date -u +%Y-%m-%d)"
           curated_release_notes="docs/releases/${tag}.md"
           notes_target="HEAD"
           range=""
 
-          if [ "$publish_existing" = "true" ] && [ -f "$curated_release_notes" ]; then
+          if [ -f "$curated_release_notes" ]; then
             cp "$curated_release_notes" release-notes.md
             echo "curated=true" >> "$GITHUB_OUTPUT"
             exit 0

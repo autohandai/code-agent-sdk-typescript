@@ -27,6 +27,37 @@ function createFakeSDK(events: SDKEvent[]): AutohandSDK {
 }
 
 describe('Agent high-level API', () => {
+  it('exposes the independent SDK event stream', async () => {
+    const expected: SDKEvent = {
+      type: 'session_peer_joined',
+      peer: {
+        version: 1,
+        pid: 42,
+        sessionId: 'peer-session',
+        workspaceRoot: '/workspace',
+        projectName: 'project',
+        provider: 'openrouter',
+        model: 'openrouter/auto',
+        mode: 'rpc',
+        status: 'working',
+        startedAt: '2026-07-28T00:00:00.000Z',
+        updatedAt: '2026-07-28T00:00:05.000Z',
+        messageCount: 1,
+        contextPercent: 2,
+        tokensUsed: 100,
+      },
+      timestamp: '2026-07-28T00:00:05.000Z',
+    };
+    const sdk = {
+      events: async function* events(): AsyncGenerator<SDKEvent> {
+        yield expected;
+      },
+    } as unknown as AutohandSDK;
+    const event = await Agent.fromSDK(sdk).events().next();
+
+    expect(event.value).toEqual(expected);
+  });
+
   it('runs a prompt to completion and returns final text with events', async () => {
     const agent = Agent.fromSDK(createFakeSDK([
       {

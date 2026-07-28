@@ -24,7 +24,12 @@
 import { spawn, ChildProcess } from 'child_process';
 import { promises as fs } from 'fs';
 import type { ProviderName, AutohandEnvVars } from '../types/index.js';
+import type { SessionAwarenessTier } from '../types/index.js';
 import { LineReader } from './line-reader.js';
+import {
+  prepareSessionAwarenessConfig,
+  type PreparedSessionAwarenessConfig,
+} from './session-awareness-config.js';
 import * as path from 'path';
 import * as os from 'os';
 import { fileURLToPath } from 'url';
@@ -102,6 +107,10 @@ export interface TransportOptions {
   addDir?: string[];
   /** Additional CLI arguments */
   extraArgs?: string[];
+  /** Explicit CLI config path */
+  configPath?: string;
+  /** Concurrent-session awareness tier applied before CLI startup */
+  sessionAwareness?: SessionAwarenessTier;
 
   // Session options
   /** Persist session to disk */
@@ -171,6 +180,7 @@ export interface TransportOptions {
 export function buildCliArgs(options: TransportOptions): string[] {
   const args = ['--mode', 'rpc'];
 
+  if (options.configPath !== undefined) args.push('--config', options.configPath);
   if (options.bare === true) args.push('--bare');
   if (options.unrestricted === true) args.push('--unrestricted');
   if (options.autoMode === true) args.push('--auto-mode');
@@ -231,6 +241,7 @@ export class Transport {
   private stopPromise: Promise<void> | null = null;
   private outputTerminationPromise: Promise<void> | null = null;
   private stderrLines: string[] = [];
+  private preparedSessionConfig: PreparedSessionAwarenessConfig | undefined;
 
   /**
    * Create a new Transport instance
@@ -259,6 +270,9 @@ export class Transport {
     this.startPromise = operation;
     try {
       await operation;
+    } catch (error) {
+      await this.cleanupPreparedSessionConfig();
+      throw error;
     } finally {
       if (this.startPromise === operation) {
         this.startPromise = null;
@@ -278,8 +292,23 @@ export class Transport {
     this.log(`Starting CLI: ${cliPath}`);
     this.log(`Working directory: ${cwd}`);
 
+    await this.cleanupPreparedSessionConfig();
+    this.preparedSessionConfig = this.options.sessionAwareness === undefined
+      ? undefined
+      : await prepareSessionAwarenessConfig({
+        awareness: this.options.sessionAwareness,
+        ...(this.options.configPath === undefined ? {} : { configPath: this.options.configPath }),
+        ...(this.options.env === undefined ? {} : { env: this.options.env }),
+        ...(this.options.envVars === undefined ? {} : { envVars: this.options.envVars }),
+      });
+
     // Build CLI arguments
-    const args = buildCliArgs(this.options);
+    const args = buildCliArgs({
+      ...this.options,
+      ...(this.preparedSessionConfig === undefined
+        ? {}
+        : { configPath: this.preparedSessionConfig.configPath }),
+    });
 
     this.log(`CLI args: ${args.join(' ')}`);
 
@@ -415,7 +444,10 @@ export class Transport {
     this.lineReader = null;
     this.failPendingRequests(stopped);
 
-    if (child === null || child.exitCode !== null) return;
+    if (child === null || child.exitCode !== null) {
+      await this.cleanupPreparedSessionConfig();
+      return;
+    }
 
     this.log('Stopping CLI process');
     child.stdin?.end();
@@ -426,6 +458,7 @@ export class Transport {
       child.kill('SIGKILL');
       await this.waitForExit(child, 1_000);
     }
+    await this.cleanupPreparedSessionConfig();
   }
 
   /**
@@ -700,6 +733,11 @@ export class Transport {
     return this.process !== null && this.process.exitCode === null;
   }
 
+  /** Process ID of the active CLI subprocess, when available. */
+  getProcessId(): number | undefined {
+    return this.process?.pid;
+  }
+
   /** Return the last stderr lines emitted by the CLI without mixing them into RPC stdout. */
   getStderrTail(): string {
     return this.stderrLines.join('\n');
@@ -711,9 +749,16 @@ export class Transport {
     this.lineReader?.close(error);
     this.lineReader = null;
     this.failPendingRequests(error);
+    void this.cleanupPreparedSessionConfig();
     for (const callback of this.terminationCallbacks) {
       callback(error);
     }
+  }
+
+  private async cleanupPreparedSessionConfig(): Promise<void> {
+    const prepared = this.preparedSessionConfig;
+    this.preparedSessionConfig = undefined;
+    await prepared?.cleanup();
   }
 
   private failPendingRequest(id: number | string, error: Error): void {
