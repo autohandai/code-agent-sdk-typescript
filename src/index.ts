@@ -60,6 +60,13 @@ export type { SessionControlRpcMethod } from './validation/session-control-rpc-r
 export { Transport } from './transport/transport.js';
 
 /**
+ * Structured concurrent-session configuration errors.
+ */
+export {
+  SessionAwarenessConfigError,
+} from './session/index.js';
+
+/**
  * Type definitions for the SDK
  */
 export * from './types/index.js';

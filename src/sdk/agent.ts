@@ -1,5 +1,6 @@
 import { AutohandSDK, formatSlashCommand } from './index.js';
 import type {
+  ActiveAgentRecord,
   CreateGoalParams,
   GoalMutationRpcResult,
   GoalSnapshotResult,
@@ -491,6 +492,23 @@ export class Agent {
    */
   static fromSDK(sdk: AutohandSDK): Agent {
     return new Agent(sdk);
+  }
+
+  /**
+   * Return live Autohand sessions sharing this agent's workspace.
+   */
+  async getSessionPeers(): Promise<ActiveAgentRecord[]> {
+    return this.sdk.getSessionPeers();
+  }
+
+  /**
+   * Subscribe to the independent SDK event stream.
+   *
+   * Use this for session-peer lifecycle and other notifications that are not
+   * owned by a single prompt run.
+   */
+  events(): AsyncGenerator<SDKEvent> {
+    return this.sdk.events();
   }
 
   /**

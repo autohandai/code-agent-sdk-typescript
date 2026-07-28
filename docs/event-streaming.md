@@ -93,6 +93,25 @@ if (event.type === 'error') {
 }
 ```
 
+### session_peer_joined / session_peer_updated / session_peer_left
+
+Concurrent Autohand sessions in the same workspace are emitted through the same
+ordered stream:
+
+```typescript
+if (event.type === 'session_peer_updated') {
+  console.log(event.peer.activity?.phase);
+  console.log(event.peer.activity?.pathsWritten);
+}
+```
+
+Use `sdk.getSessionPeers()` for an on-demand snapshot. See the
+[session-awareness guide](./session-awareness.md) for tier and coordination
+behavior.
+
+If a registry read fails, the stream receives a recoverable
+`session_awareness_error` event and observation continues on the next poll.
+
 ## Building a Simple Chat UI
 
 ```typescript

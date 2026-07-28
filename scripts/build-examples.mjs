@@ -8,12 +8,21 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const examplesDir = join(repoRoot, 'examples');
 const requestedEntries = process.argv.slice(2);
 
+function collectTypeScriptEntries(directory, prefix = 'examples') {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const relativePath = join(prefix, entry.name);
+      if (entry.isDirectory()) {
+        return collectTypeScriptEntries(join(directory, entry.name), relativePath);
+      }
+      return entry.name.endsWith('.ts') ? [relativePath] : [];
+    });
+}
+
 const entries = requestedEntries.length > 0
   ? requestedEntries
-  : readdirSync(examplesDir)
-    .filter((fileName) => fileName.endsWith('.ts'))
-    .sort()
-    .map((fileName) => `examples/${fileName}`);
+  : collectTypeScriptEntries(examplesDir);
 
 const outputName = requestedEntries.length === 1
   ? `autohand-sdk-${basename(requestedEntries[0], '.ts')}-check`

@@ -22,7 +22,15 @@
  */
 
 import { Transport, type TransportOptions } from '../transport/transport.js';
+import os from 'os';
+import path from 'path';
+import {
+  ActiveAgentRegistryReader,
+  SessionAwarenessMonitor,
+  validateSessionAwarenessTier,
+} from '../session/index.js';
 import type {
+  ActiveAgentRecord,
   SDKConfig,
   PromptParams,
   PromptResult,
@@ -214,6 +222,7 @@ const MAX_EVENT_BACKLOG = 1_024;
 
 export class RPCClient {
   private transport: Transport;
+  private readonly sessionAwareness: SessionAwarenessMonitor;
   private eventBacklog: SDKEvent[] = [];
   private eventSubscribers = new Set<EventSubscriber>();
   private eventStreamsClosed = false;
@@ -244,6 +253,9 @@ export class RPCClient {
    * @param config.extraArgs - Additional CLI arguments
    */
   constructor(config: SDKConfig = {}) {
+    if (config.sessions?.awareness !== undefined) {
+      validateSessionAwarenessTier(config.sessions.awareness);
+    }
     // Detect provider from model ID if not explicitly set
     const detectedProvider = config.model !== undefined ? detectProviderFromModel(config.model) : undefined;
     const provider = config.provider ?? detectedProvider;
@@ -305,6 +317,9 @@ export class RPCClient {
     if (config.additionalDirectories !== undefined) transportOptions.addDir = config.additionalDirectories;
     if (config.addDir !== undefined) transportOptions.addDir = config.addDir;
     if (config.extraArgs !== undefined) transportOptions.extraArgs = config.extraArgs;
+    if (config.sessions?.awareness !== undefined) {
+      transportOptions.sessionAwareness = config.sessions.awareness;
+    }
     if (config.persistSession !== undefined) transportOptions.persistSession = config.persistSession;
     if (config.session?.persist !== undefined) transportOptions.persistSession = config.session.persist;
     if (config.session?.persistSession !== undefined) transportOptions.persistSession = config.session.persistSession;
@@ -341,7 +356,27 @@ export class RPCClient {
     if (config.hooks?.hooks !== undefined) transportOptions.hooksDefinitions = config.hooks.hooks;
 
     this.transport = new Transport(transportOptions);
-    this.transport.onTermination(() => this.closeEventStreams());
+    const workspaceRoot = path.resolve(config.cwd ?? process.cwd());
+    const autohandHome = config.envVars?.AUTOHAND_HOME
+      ?? config.env?.AUTOHAND_HOME
+      ?? process.env.AUTOHAND_HOME
+      ?? path.join(os.homedir(), '.autohand');
+    this.sessionAwareness = new SessionAwarenessMonitor({
+      workspaceRoot,
+      reader: new ActiveAgentRegistryReader(path.join(autohandHome, 'active-agents')),
+      onEvent: (event) => this.queueEvent(event),
+      onError: (error) => this.queueEvent({
+        type: 'session_awareness_error',
+        operation: error.operation,
+        message: error.message,
+        recoverable: true,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    this.transport.onTermination(() => {
+      this.sessionAwareness.stop();
+      this.closeEventStreams();
+    });
 
     // Register notification handlers
     this.setupNotificationHandlers();
@@ -355,12 +390,15 @@ export class RPCClient {
   async start(): Promise<void> {
     await this.transport.start();
     this.eventStreamsClosed = false;
+    this.sessionAwareness.setOwnPid(this.transport.getProcessId());
+    await this.sessionAwareness.start();
   }
 
   /**
    * Stop the client and close the transport
    */
   async stop(): Promise<void> {
+    this.sessionAwareness.stop();
     try {
       await this.transport.stop();
     } finally {
@@ -404,6 +442,15 @@ export class RPCClient {
    */
   async getState(params: GetStateParams = {}): Promise<GetStateResult> {
     return this.transport.request('autohand.getState', params) as Promise<GetStateResult>;
+  }
+
+  /**
+   * Return live Autohand sessions sharing this client's workspace.
+   *
+   * The current CLI session is excluded once its session ID is known.
+   */
+  async getSessionPeers(): Promise<ActiveAgentRecord[]> {
+    return this.sessionAwareness.refresh();
   }
 
   /**
@@ -1008,6 +1055,7 @@ export class RPCClient {
     // Agent lifecycle
     this.transport.onNotification('autohand.agentStart', (params) => {
       const p = params as { sessionId: string; model: string; workspace: string; timestamp: string };
+      this.sessionAwareness.setOwnSessionId(p.sessionId);
       this.queueEvent({ type: 'agent_start', sessionId: p.sessionId, model: p.model, workspace: p.workspace, timestamp: p.timestamp });
     });
 

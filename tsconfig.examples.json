@@ -8,7 +8,9 @@
     "sourceMap": false
   },
   "include": [
-    "examples/27-autoresearch-ledger.ts"
+    "examples/27-autoresearch-ledger.ts",
+    "examples/28-session-awareness.ts",
+    "examples/session-awareness/**/*.ts"
   ],
   "exclude": [
     "node_modules",

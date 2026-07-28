@@ -677,6 +677,60 @@ export interface SessionSettings {
   autoSaveInterval?: number;
 }
 
+/** How a session reacts to concurrent Autohand sessions in the same workspace. */
+export type SessionAwarenessTier = 'passive' | 'warn' | 'coordinate';
+
+/** Concurrent-session settings shared with CLI-3. */
+export interface SessionsSettings {
+  /** Defaults to `warn` in CLI-3. */
+  awareness?: SessionAwarenessTier;
+}
+
+export type ActiveAgentMode = 'interactive' | 'command' | 'rpc' | 'acp' | 'teammate';
+export type ActiveAgentStatus = 'idle' | 'working';
+export type ActiveAgentPhase =
+  | 'idle'
+  | 'thinking'
+  | 'editing'
+  | 'running_command'
+  | 'waiting_input';
+
+/** Activity published by a live Autohand session. */
+export interface ActiveAgentActivity {
+  phase: ActiveAgentPhase;
+  instruction?: string;
+  command?: string;
+  /** Workspace-relative paths, newest first. */
+  pathsWritten: string[];
+  /** Coordinate-tier path claims. */
+  claims?: string[];
+  headRef?: {
+    branch: string | null;
+    sha: string;
+  };
+}
+
+/** Versioned record published by CLI-3 under `~/.autohand/active-agents`. */
+export interface ActiveAgentRecord {
+  version: 1;
+  pid: number;
+  sessionId: string;
+  workspaceRoot: string;
+  projectName: string;
+  provider: string;
+  model: string;
+  mode: ActiveAgentMode;
+  status: ActiveAgentStatus;
+  startedAt: string;
+  updatedAt: string;
+  messageCount: number;
+  contextPercent: number;
+  tokensUsed: number;
+  tokensUsageStatus?: 'actual' | 'unavailable';
+  sessionTokensUsed?: number;
+  activity?: ActiveAgentActivity;
+}
+
 // ============================================================================
 // AGENTS.md Types
 // ============================================================================
@@ -1225,6 +1279,8 @@ export interface SDKConfig {
   // ============================================================================
   /** Session settings */
   session?: SessionSettings;
+  /** Concurrent-session awareness settings applied before CLI startup. */
+  sessions?: SessionsSettings;
   /** Persist session to disk (legacy, use session.persistSession) */
   persistSession?: boolean;
   /** Session ID to resume (legacy, use session.sessionId) */
@@ -1376,6 +1432,7 @@ export interface FeatureFlagSettings {
 
 export interface CLIConfig {
   provider?: string;
+  sessions?: SessionsSettings;
   openrouter?: {
     apiKey?: string;
     model?: string;
@@ -2362,6 +2419,8 @@ export type SDKEvent =
   | McpToolsChangedEvent
   | LearnProgressEvent
   | UnknownNotificationEvent
+  | SessionPeerEvent
+  | SessionAwarenessErrorEvent
   | AutoresearchEvent
   | AutoresearchOperationEvent
   | ErrorEvent;
@@ -2371,6 +2430,40 @@ export interface UnknownNotificationEvent {
   type: 'unknown_notification';
   method: string;
   params: unknown;
+}
+
+/** Ordered peer lifecycle events emitted from the shared active-agent registry. */
+export type SessionPeerEvent =
+  | SessionPeerJoinedEvent
+  | SessionPeerUpdatedEvent
+  | SessionPeerLeftEvent;
+
+export interface SessionPeerJoinedEvent {
+  type: 'session_peer_joined';
+  peer: ActiveAgentRecord;
+  timestamp: string;
+}
+
+export interface SessionPeerUpdatedEvent {
+  type: 'session_peer_updated';
+  peer: ActiveAgentRecord;
+  previous: ActiveAgentRecord;
+  timestamp: string;
+}
+
+export interface SessionPeerLeftEvent {
+  type: 'session_peer_left';
+  peer: ActiveAgentRecord;
+  timestamp: string;
+}
+
+/** Recoverable failure while observing the advisory active-session registry. */
+export interface SessionAwarenessErrorEvent {
+  type: 'session_awareness_error';
+  operation: 'initial_read' | 'poll';
+  message: string;
+  recoverable: true;
+  timestamp: string;
 }
 
 export interface AutomodeIterationEvent {

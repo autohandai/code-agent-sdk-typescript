@@ -23,6 +23,8 @@ The SDK:
 - Enforces a reproducible p95 startup budget below 50 ms
 
 See [reliability and startup performance](docs/reliability-and-performance.md) for the benchmark contract and the transport fixes included in the current release.
+See [concurrent session awareness](docs/session-awareness.md) for peer discovery,
+ordered peer events, and coordinate-tier write confirmations.
 
 ## Other Programming Languages (Beta)
 
@@ -229,6 +231,17 @@ The SDK uses the CLI's configuration file (`~/.autohand/config.json`). You can c
     "model": "openrouter/auto"
   }
 }
+```
+
+Concurrent sessions can be surfaced or coordinated per SDK instance:
+
+```typescript
+const agent = await Agent.create({
+  cwd: '.',
+  sessions: { awareness: 'warn' }, // passive | warn | coordinate
+});
+
+console.log(await agent.getSessionPeers());
 ```
 
 ## API Reference
@@ -582,6 +595,10 @@ The SDK emits the following events:
 - `tool_update` - Tool output update (streaming)
 - `tool_end` - Tool execution ended
 - `permission_request` - Permission request from agent
+- `session_peer_joined` - A live Autohand session appeared in this workspace
+- `session_peer_updated` - A peer's meaningful status or activity changed
+- `session_peer_left` - A peer exited or became stale
+- `session_awareness_error` - A recoverable registry observation failure
 - `autoresearch` - Autoresearch lifecycle or typed ledger-operation event
 - `error` - Error occurred
 
@@ -603,9 +620,15 @@ See the `examples/` directory for more examples:
 - `25-structured-json.ts` - JSON output with optional validation
 - `26-runtime-error-to-pr.ts` - Turn a captured runtime error into a repair pull request
 - `27-autoresearch-ledger.ts` - Replayable autoresearch lifecycle and ledger analysis
+- `28-session-awareness.ts` - Concurrent-session discovery and coordination
+- `session-awareness/` - Ten executable combinations covering streaming,
+  permissions, sub-agents, teams, goals, skills, MCP, auto-mode, autoresearch,
+  and structured output
 
 See also [SDLC workflows](./docs/sdlc-workflows.md) and the
 [replayable autoresearch guide](./docs/autoresearch.md).
+The [session-awareness guide](./docs/session-awareness.md) covers tiers, peer
+activity, event handling, and security boundaries.
 
 ## CLI Binaries
 

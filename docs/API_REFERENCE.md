@@ -65,6 +65,39 @@ const agent = Agent.fromSDK(sdk);
 
 ---
 
+#### `agent.getSessionPeers(): Promise<ActiveAgentRecord[]>`
+
+Return live Autohand sessions sharing the agent's workspace. The current
+SDK-owned CLI process is excluded.
+
+```typescript
+const peers = await agent.getSessionPeers();
+console.log(peers.map((peer) => peer.activity?.phase));
+```
+
+Peer joins, meaningful updates, and departures also appear as
+`session_peer_joined`, `session_peer_updated`, and `session_peer_left` events.
+
+---
+
+#### `agent.events(): AsyncGenerator<SDKEvent>`
+
+Subscribe to the independent SDK event stream. Use this for peer lifecycle,
+hook, permission, and other notifications that are not owned by one prompt.
+
+```typescript
+for await (const event of agent.events()) {
+  if (event.type === 'session_peer_joined') {
+    console.log(event.peer.sessionId);
+  }
+}
+```
+
+For events belonging to a specific prompt, prefer `agent.stream(...)` or the
+`Run` returned by `agent.send(...)`.
+
+---
+
 #### `agent.send(input: AgentInput, options?: AgentSendOptions): Promise<Run>`
 
 Create a run without waiting for it to finish.
@@ -503,6 +536,16 @@ await sdk.close();
 ```
 
 **Returns:** `Promise<void>`
+
+---
+
+#### `sdk.getSessionPeers(): Promise<ActiveAgentRecord[]>`
+
+Return a validated snapshot of live peer sessions in this SDK's workspace.
+`RPCClient.getSessionPeers()` provides the same low-level operation.
+
+See [Concurrent Session Awareness](./session-awareness.md) for activity fields,
+security guarantees, and coordinate-tier permission handling.
 
 ---
 
@@ -1422,6 +1465,9 @@ interface SDKConfig {
 
   // Session Configuration
   session?: SessionSettings;
+  sessions?: {
+    awareness?: 'passive' | 'warn' | 'coordinate';
+  };
   persistSession?: boolean;
   sessionId?: string;
   resume?: boolean;

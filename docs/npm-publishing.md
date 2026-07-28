@@ -49,7 +49,10 @@ The tag is pushed before the draft release and npm publication so repository per
 
 npm provenance identifies the workflow trigger commit and ref. Because the generated release commit is created later inside that run, provenance does not claim that the detached tag itself triggered publication. The annotated tag records the generated package metadata and source, while the uploaded tarball checksum identifies the exact published artifact. A release policy requiring provenance to resolve directly to the tag must use a second publishing run triggered from that tag.
 
-Curated GitHub release bodies live in `docs/releases/vX.Y.Z.md`. The `publish_existing` and `release_notes_only` modes prefer that versioned file when it exists; otherwise they generate notes from the exact preceding-stable-tag to requested-tag range.
+Curated GitHub release bodies live in `docs/releases/vX.Y.Z.md`. Initial,
+`publish_existing`, and `release_notes_only` runs use that versioned file when
+it exists; otherwise they generate notes from the exact
+preceding-stable-tag-to-requested-tag range.
 
 ## Workflow Modes
 
