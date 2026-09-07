@@ -108,6 +108,8 @@ export type ProviderName = BuiltInProviderName | CustomProviderId;
  * These are forwarded to the CLI subprocess when spawning.
  */
 export interface AutohandEnvVars {
+  /** Provider selection for the CLI process; explicit SDK provider takes precedence. */
+  AUTOHAND_PROVIDER?: ProviderName;
   /** Base directory for all Autohand user data and configuration (default: ~/.autohand) */
   AUTOHAND_HOME?: string;
   /** API base URL for authentication and sync services */

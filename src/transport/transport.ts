@@ -336,6 +336,10 @@ export class Transport {
       }
     }
 
+    if (this.options.provider !== undefined) {
+      env.AUTOHAND_PROVIDER = this.options.provider;
+    }
+
     this.stderrLines = [];
     const child = spawn(cliPath, args, {
       cwd,
