@@ -3245,6 +3245,11 @@ export interface AgentInfo {
   name: string;
   description: string;
   tools?: string[];
+  model?: string;
+  source?: string;
+  extensionId?: string;
+  extensionVersion?: string;
+  extensionScope?: 'user' | 'project';
 }
 
 export interface ContextUsage {

@@ -764,6 +764,12 @@ export class RPCClient {
     return this.transport.request('autohand.getSupportedCommands', {});
   }
 
+  /** Get the effective subagent registry for this session. */
+  async getSupportedAgents() {
+    const result = await this.transport.request('autohand.getSupportedAgents', {});
+    return validateExtensionRpcResult('autohand.getSupportedAgents', result);
+  }
+
   async getGoal(): Promise<GoalSnapshotResult> {
     return this.transport.request('autohand.goal.get', {}) as Promise<GoalSnapshotResult>;
   }

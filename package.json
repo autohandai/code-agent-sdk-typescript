@@ -28,6 +28,7 @@
     "cli",
     "README.md",
     "CHANGELOG.md",
+    "docs/agent-discovery.md",
     "docs/autoresearch.md",
     "docs/agent-cli-comparison.md",
     "docs/session-awareness.md",

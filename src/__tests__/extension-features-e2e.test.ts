@@ -96,6 +96,42 @@ afterEach(async () => {
 });
 
 describe('extension RPC features', () => {
+  it('discovers effective agents with model and extension provenance', async () => {
+    const agents = [{
+      id: 'reviewer', name: 'reviewer', description: 'Review changes',
+      tools: ['read_file'], model: 'fantail', source: 'extension',
+      extensionId: 'example.review', extensionVersion: '1.0.0', extensionScope: 'project',
+    }];
+    await expect(withSDK({
+      method: 'autohand.getSupportedAgents', params: {}, result: { agents },
+    }, (sdk) => sdk.supportedAgents())).resolves.toEqual(agents);
+  });
+
+  for (const result of [
+    {}, { agents: null }, { agents: [{}] },
+    { agents: [{ id: 'one', name: 'one', description: 'Agent', tools: [1] }] },
+    { agents: [{ id: 'one', name: 'one', description: 'Agent', tools: [], extensionScope: 'invalid' }] },
+  ]) {
+    it(`rejects malformed agent discovery results: ${JSON.stringify(result)}`, async () => {
+      await expect(withSDK({
+        method: 'autohand.getSupportedAgents', params: {}, result,
+      }, (sdk) => sdk.supportedAgents())).rejects.toThrow(/Invalid RPC result for autohand\.getSupportedAgents/);
+    });
+  }
+
+  it('waits for lazy startup before discovering agents', async () => {
+    const agents = [{ id: 'reviewer', name: 'reviewer', description: 'Review', tools: [] }];
+    const cliPath = await createFeatureCli({
+      method: 'autohand.getSupportedAgents', params: {}, result: { agents },
+    });
+    const sdk = new AutohandSDK({ cliPath, timeout: 10_000 });
+    try {
+      expect(await sdk.supportedAgents()).toEqual(agents);
+    } finally {
+      await sdk.close();
+    }
+  });
+
   it('acknowledges a permission request through the spawned CLI', async () => {
     const fixture = {
       method: 'autohand.permissionAcknowledged',

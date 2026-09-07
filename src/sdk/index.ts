@@ -1149,8 +1149,8 @@ export class AutohandSDK {
    * ```
    */
   async supportedAgents(): Promise<AgentInfo[]> {
-    // TODO: Implement RPC method to get supported agents
-    return [];
+    await this.ensureStarted();
+    return (await this.client.getSupportedAgents()).agents;
   }
 
   /**

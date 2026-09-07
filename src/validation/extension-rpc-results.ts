@@ -1,5 +1,6 @@
 import { RpcResultValidationError } from './session-control-rpc-results.js';
 import type {
+  AgentInfo,
   ChangesDecisionResult,
   GetHistoryResult,
   GetSessionResult,
@@ -450,6 +451,31 @@ function getToolsRegistryResult(
   };
 }
 
+function agentInfo(value: unknown, method: string, path: string): AgentInfo {
+  const record = object(value, method, path);
+  const agent: AgentInfo = {
+    id: string(record.id, method, `${path}.id`),
+    name: string(record.name, method, `${path}.name`),
+    description: string(record.description, method, `${path}.description`),
+    tools: array(record.tools, method, `${path}.tools`, string),
+  };
+  for (const key of ['model', 'source', 'extensionId', 'extensionVersion'] as const) {
+    if (record[key] !== undefined) agent[key] = string(record[key], method, `${path}.${key}`);
+  }
+  if (record.extensionScope !== undefined) {
+    if (record.extensionScope !== 'user' && record.extensionScope !== 'project') {
+      return invalid(method, `${path}.extensionScope`, 'user or project', record.extensionScope);
+    }
+    agent.extensionScope = record.extensionScope;
+  }
+  return agent;
+}
+
+function getSupportedAgentsResult(value: unknown, method: string, path: string): { agents: AgentInfo[] } {
+  const record = object(value, method, path);
+  return { agents: array(record.agents, method, `${path}.agents`, agentInfo) };
+}
+
 function setContextCompactResult(
   value: unknown,
   method: string,
@@ -475,6 +501,7 @@ interface ExtensionRpcResultMap {
   'autohand.learn.update': LearnUpdateResult;
   'autohand.learn.generate': LearnGenerateResult;
   'autohand.getToolsRegistry': GetToolsRegistryResult;
+  'autohand.getSupportedAgents': { agents: AgentInfo[] };
   'autohand.setContextCompact': SetContextCompactResult;
 }
 
@@ -513,6 +540,8 @@ const validators: {
     learnGenerateResult(value, 'autohand.learn.generate', path),
   'autohand.getToolsRegistry': (value, path) =>
     getToolsRegistryResult(value, 'autohand.getToolsRegistry', path),
+  'autohand.getSupportedAgents': (value, path) =>
+    getSupportedAgentsResult(value, 'autohand.getSupportedAgents', path),
   'autohand.setContextCompact': (value, path) =>
     setContextCompactResult(value, 'autohand.setContextCompact', path),
 };
