@@ -664,7 +664,8 @@ const sdk = new AutohandSDK({
 
 ## Development
 
-Use Bun 1.4.0 and Node.js 24. CI installs the committed `bun.lock` with
+Use the Bun version declared in `package.json` (currently 1.4.2) and Node.js 24.
+Every CI and release job reads that declaration. CI installs the committed `bun.lock` with
 `--frozen-lockfile`; Dependabot updates the Bun lockfile and groups the ESLint
 packages so their peer dependencies move together.
 

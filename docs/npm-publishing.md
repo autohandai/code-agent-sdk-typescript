@@ -1,6 +1,6 @@
 # npm Publishing
 
-The TypeScript SDK validates, tests, canary-publishes, and releases the public npm package `@autohandai/agent-sdk` from GitHub Actions. Dependencies are installed with Bun 1.4.0 and the committed `bun.lock` in frozen mode. Validation audits production and development dependencies; npm remains the publication client for provenance.
+The TypeScript SDK validates, tests, canary-publishes, and releases the public npm package `@autohandai/agent-sdk` from GitHub Actions. Every job uses Node.js 24 and reads the Bun version from `package.json` (`packageManager`). Dependencies are installed from the committed `bun.lock` in frozen mode. Validation audits production and development dependencies; npm remains the publication client for provenance.
 
 ## Publishing Authentication
 
