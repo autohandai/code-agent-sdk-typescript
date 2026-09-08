@@ -63,19 +63,19 @@ describe('AutohandSDK with OpenRouter provider', () => {
   });
 
   test('Tool enum matches actual CLI-3 tool names', () => {
-    expect(Tool.READ_FILE).toBe('read_file');
-    expect(Tool.WRITE_FILE).toBe('write_file');
-    expect(Tool.RUN_COMMAND).toBe('run_command');
-    expect(Tool.WEB_SEARCH).toBe('web_search');
-    expect(Tool.GIT_STATUS).toBe('git_status');
-    expect(Tool.GIT_DIFF).toBe('git_diff');
-    expect(Tool.GIT_LOG).toBe('git_log');
-    expect(Tool.GIT_COMMIT).toBe('git_commit');
-    expect(Tool.FIND).toBe('find');
-    expect(Tool.SEARCH).toBe('search');
-    expect(Tool.APPLY_PATCH).toBe('apply_patch');
-    expect(Tool.NOTEBOOK_READ).toBe('notebook_read');
-    expect(Tool.NOTEBOOK_EDIT).toBe('notebook_edit');
+    expect<string>(Tool.READ_FILE).toBe('read_file');
+    expect<string>(Tool.WRITE_FILE).toBe('write_file');
+    expect<string>(Tool.RUN_COMMAND).toBe('run_command');
+    expect<string>(Tool.WEB_SEARCH).toBe('web_search');
+    expect<string>(Tool.GIT_STATUS).toBe('git_status');
+    expect<string>(Tool.GIT_DIFF).toBe('git_diff');
+    expect<string>(Tool.GIT_LOG).toBe('git_log');
+    expect<string>(Tool.GIT_COMMIT).toBe('git_commit');
+    expect<string>(Tool.FIND).toBe('find');
+    expect<string>(Tool.SEARCH).toBe('search');
+    expect<string>(Tool.APPLY_PATCH).toBe('apply_patch');
+    expect<string>(Tool.NOTEBOOK_READ).toBe('notebook_read');
+    expect<string>(Tool.NOTEBOOK_EDIT).toBe('notebook_edit');
   });
 });
 

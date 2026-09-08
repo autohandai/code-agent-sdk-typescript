@@ -664,25 +664,24 @@ const sdk = new AutohandSDK({
 
 ## Development
 
+Use Bun 1.4.0 and Node.js 24. CI installs the committed `bun.lock` with
+`--frozen-lockfile`; Dependabot updates the Bun lockfile and groups the ESLint
+packages so their peer dependencies move together.
+
 ```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Watch mode
-npm run dev
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
-
-# Test
-npm run test
+bun install --frozen-lockfile
+bun run build
+bun run dev
+bun run typecheck
+bun run lint
+bun run test
+bun run prepublishOnly
 ```
+
+Builds and typechecks use TypeScript 7 through the `@typescript/native` alias.
+ESLint uses the TypeScript 6 compatibility API under the `typescript` name,
+following [Microsoft's supported side-by-side setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0).
+The compatibility package exposes `tsc6`, keeping the `tsc` command on version 7.
 
 ## Architecture Details
 

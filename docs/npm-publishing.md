@@ -1,6 +1,6 @@
 # npm Publishing
 
-The TypeScript SDK validates, tests, canary-publishes, and releases the public npm package `@autohandai/agent-sdk` from GitHub Actions.
+The TypeScript SDK validates, tests, canary-publishes, and releases the public npm package `@autohandai/agent-sdk` from GitHub Actions. Dependencies are installed with Bun 1.4.0 and the committed `bun.lock` in frozen mode. Validation audits production and development dependencies; npm remains the publication client for provenance.
 
 ## Publishing Authentication
 
@@ -45,7 +45,7 @@ Manual runs create stable releases such as `v1.0.2` and publish them under the s
 
 This repository has a protected `main` branch with pull-request and verified-signature requirements. The release workflow never pushes generated commits to that branch and therefore does not require a bypass-capable token. It creates the generated package-version and changelog commit in detached HEAD state, records that source and release metadata under an annotated tag, and pushes only the tag. The checked-out `main` commit remains unchanged.
 
-The tag is pushed before the draft release and npm publication so repository permission failures cannot leave a public package without its source tag. If a later publishing step fails, rerun `Release SDK` with the explicit version and `publish_existing` enabled. Recovery accepts only an annotated, one-parent release commit whose parent is reachable from `origin/main` and whose diff is limited to `package.json`, `package-lock.json`, and `CHANGELOG.md`; it then validates the recorded version, rebuilds that tagged source, and skips duplicate npm publication when necessary.
+The tag is pushed before the draft release and npm publication so repository permission failures cannot leave a public package without its source tag. If a later publishing step fails, rerun `Release SDK` with the explicit version and `publish_existing` enabled. Recovery accepts only an annotated, one-parent release commit whose parent is reachable from `origin/main` and whose diff is limited to `package.json`, `bun.lock`, legacy `package-lock.json`, and `CHANGELOG.md`; it then validates the recorded version, rebuilds that tagged source, and skips duplicate npm publication when necessary.
 
 npm provenance identifies the workflow trigger commit and ref. Because the generated release commit is created later inside that run, provenance does not claim that the detached tag itself triggered publication. The annotated tag records the generated package metadata and source, while the uploaded tarball checksum identifies the exact published artifact. A release policy requiring provenance to resolve directly to the tag must use a second publishing run triggered from that tag.
 

@@ -914,8 +914,8 @@ export async function loadConfigFrom(configPath: string): Promise<SDKConfig> {
         try {
           const toml = await import('toml');
           config = toml.parse(content) as SDKConfig;
-        } catch (e) {
-          throw new Error('TOML parser not installed. Install with: npm install toml');
+        } catch (error) {
+          throw new Error('TOML parser not installed. Install with: npm install toml', { cause: error });
         }
         break;
       case 'yaml':
@@ -923,23 +923,23 @@ export async function loadConfigFrom(configPath: string): Promise<SDKConfig> {
         try {
           const yaml = await import('yaml');
           config = yaml.parse(content) as SDKConfig;
-        } catch (e) {
-          throw new Error('YAML parser not installed. Install with: npm install yaml');
+        } catch (error) {
+          throw new Error('YAML parser not installed. Install with: npm install yaml', { cause: error });
         }
         break;
       default:
         // Try JSON as fallback
         try {
           config = JSON.parse(content) as SDKConfig;
-        } catch {
-          throw new Error(`Unsupported config format: ${ext}. Supported formats: json, toml, yaml, yml`);
+        } catch (error) {
+          throw new Error(`Unsupported config format: ${ext}. Supported formats: json, toml, yaml, yml`, { cause: error });
         }
     }
     
     // Merge with environment variables
     return mergeEnvVariables(config);
   } catch (error) {
-    throw new Error(`Failed to load config from ${expandedPath}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Failed to load config from ${expandedPath}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 }
 
@@ -1079,7 +1079,7 @@ export async function loadAgentsMd(source: string): Promise<string> {
       }
       return await response.text();
     } catch (error) {
-      throw new Error(`Failed to fetch AGENTS.md from ${source}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Failed to fetch AGENTS.md from ${source}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     }
   }
   
@@ -1895,13 +1895,9 @@ export interface ImageAttachment {
   filename?: string;
 }
 
-export interface AbortParams {
-  // No params needed
-}
+export type AbortParams = Record<string, never>;
 
-export interface GetStateParams {
-  // No params needed
-}
+export type GetStateParams = Record<string, never>;
 
 export interface GetMessagesParams {
   limit?: number;

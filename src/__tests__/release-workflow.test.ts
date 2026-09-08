@@ -84,7 +84,7 @@ describe('SDK release workflow', () => {
       'git diff --name-only "$tag_parent" "$tag_commit"',
     );
     expect(workflow).toContain(
-      'package.json|package-lock.json|CHANGELOG.md',
+      'package.json|package-lock.json|bun.lock|CHANGELOG.md',
     );
   });
 
