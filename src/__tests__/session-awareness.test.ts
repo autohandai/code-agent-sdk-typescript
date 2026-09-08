@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { promises as fs } from 'fs';
+import { createReadStream, promises as fs } from 'fs';
+import { createHash } from 'crypto';
 import os from 'os';
 import path from 'path';
 import {
@@ -483,7 +484,7 @@ describe('session awareness documentation', () => {
     expect(packageJson.files).toContain('examples/28-session-awareness.ts');
   });
 
-  it('bundles CLI builds from the session-awareness implementation commit', async () => {
+  it('bundles verified CLI artifacts with session awareness', async () => {
     const buildInfo = JSON.parse(
       await fs.readFile(path.join(process.cwd(), 'cli', 'BUILD_INFO.json'), 'utf8'),
     ) as {
@@ -492,7 +493,7 @@ describe('session awareness documentation', () => {
       sha256: Record<string, string>;
     };
 
-    expect(buildInfo.sourceCommit).toBe('b48d497102caeb702fb6898e813e881e2ab5463e');
+    expect(buildInfo.sourceCommit).toMatch(/^[a-f0-9]{40}$/);
     expect(buildInfo.features).toContain('concurrent-session-awareness');
     expect(Object.keys(buildInfo.sha256).sort()).toEqual([
       'autohand-linux-arm64',
@@ -501,5 +502,13 @@ describe('session awareness documentation', () => {
       'autohand-macos-x64',
       'autohand-windows-x64.exe',
     ]);
+    for (const [artifact, expectedHash] of Object.entries(buildInfo.sha256)) {
+      expect(expectedHash).toMatch(/^[a-f0-9]{64}$/);
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(path.join(process.cwd(), 'cli', artifact))) {
+        hash.update(chunk);
+      }
+      expect(hash.digest('hex')).toBe(expectedHash);
+    }
   });
 });

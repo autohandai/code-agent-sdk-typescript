@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
@@ -17,6 +17,11 @@ updates:
       prefix-development: deps-dev
       include: scope
     groups:
+      typescript-eslint:
+        patterns:
+          - "@typescript-eslint/*"
+          - "eslint"
+          - "@eslint/*"
       production-dependencies:
         dependency-type: production
         update-types:

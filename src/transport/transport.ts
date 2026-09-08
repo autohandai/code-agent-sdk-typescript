@@ -448,7 +448,7 @@ export class Transport {
     this.lineReader = null;
     this.failPendingRequests(stopped);
 
-    if (child === null || child.exitCode !== null) {
+    if (child?.exitCode !== null) {
       await this.cleanupPreparedSessionConfig();
       return;
     }
@@ -478,7 +478,7 @@ export class Transport {
    */
   async request(method: string, params?: unknown): Promise<unknown> {
     const child = this.process;
-    if (child === null || child.exitCode !== null || child.stdin === null || !child.stdin.writable) {
+    if (child?.exitCode !== null || child.stdin?.writable !== true) {
       throw new Error('CLI process not started');
     }
 
@@ -654,7 +654,7 @@ export class Transport {
           this.unknownNotificationCallback?.(response.method, response.params);
         }
       }
-    } catch (error) {
+    } catch {
       this.log(`Error parsing line: ${line}`);
     }
   }
@@ -820,7 +820,7 @@ export class Transport {
 
         // Determine skill name from directory structure
         // e.g., "./skills/my-skill/SKILL.md" -> "my-skill"
-        const parts = skill.split(/[\\/]/).filter(p => p && p !== '.' && p !== '..');
+        const parts = skill.split(/[\\/]/).filter(p => p !== '' && p !== '.' && p !== '..');
         let skillName = parts[parts.length - 1];
         if (skillName === 'SKILL.md' && parts.length > 1) {
           skillName = parts[parts.length - 2];

@@ -73,19 +73,19 @@ jobs:
           git lfs checkout
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-          cache: npm
+          package-manager-cache: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.22
+          bun-version: 1.4.0
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Resolve release version
         id: version
@@ -171,7 +171,7 @@ jobs:
 
               while IFS= read -r changed_file; do
                 case "$changed_file" in
-                  package.json|package-lock.json|CHANGELOG.md)
+                  package.json|package-lock.json|bun.lock|CHANGELOG.md)
                     ;;
                   *)
                     echo "::error::publish_existing candidate '$candidate_tag' changes unexpected file '$changed_file'."
@@ -455,7 +455,7 @@ jobs:
           git checkout --detach "$GITHUB_SHA"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json CHANGELOG.md
+          git add package.json bun.lock CHANGELOG.md
           git commit \
             -m "chore(release): ${{ steps.version.outputs.tag }}" \
             -m "Prepare the validated package, changelog, and release tag." \

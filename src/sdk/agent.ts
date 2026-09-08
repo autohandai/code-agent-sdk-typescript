@@ -186,7 +186,7 @@ function stringifySchema(schema: unknown): string {
   try {
     return JSON.stringify(schema, null, 2);
   } catch (error) {
-    throw new Error(`JSON output schema must be serializable: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`JSON output schema must be serializable: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 }
 
@@ -425,9 +425,7 @@ export class Run {
   }
 
   private ensureStarted(): void {
-    if (this.resultPromise === undefined) {
-      this.resultPromise = this.pump();
-    }
+    this.resultPromise ??= this.pump();
   }
 
   private async pump(): Promise<RunResult> {
