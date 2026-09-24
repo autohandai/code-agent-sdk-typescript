@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.5-alpha.35.095c0b1 - 2026-09-24
+
+> Bleeding edge alpha build from main.
+
+Compare: https://github.com/autohandai/code-agent-sdk-typescript/compare/v1.0.5...v1.0.5-alpha.35.095c0b1
+
+### Changes
+
+- feat: add typed Weka decision client (#37) (095c0b1)
+- Align SDK CI and releases on Node 24 and Bun 1.4.2 (#36) (b16f67f)
+- fix: keep Bun lockfile compatible with Dependabot (b847cb7)
+- fix: restore CI with compatible dependency upgrades (3025a56)
+- fix: select the configured provider when starting the CLI (42c88ee)
+- deps-dev(deps-dev): bump @types/bun (631e390)
+- deps-dev(deps-dev): bump @typescript-eslint/eslint-plugin (bfcc2cf)
+- deps-dev(deps-dev): bump eslint from 8.57.1 to 10.8.1 (805626b)
+- deps-dev(deps-dev): bump @types/node from 20.19.39 to 26.2.0 (aa94151)
+- deps-dev(deps-dev): bump @typescript-eslint/parser from 6.21.0 to 8.67.0 (5c7e2d8)
+- deps(deps): bump actions/setup-node in the github-actions group (638ca76)
+- deps(deps): bump toml from 4.1.1 to 5.0.0 (56441f5)
+- deps-dev(deps-dev): bump typescript from 5.9.3 to 7.0.2 (cf64dfd)
+
 ## Unreleased
 
 ### Added
