@@ -44,6 +44,34 @@ export type {
 export { AutohandSDK, formatSlashCommand } from './sdk/index.js';
 
 /**
+ * Typed Weka decision API client.
+ */
+export {
+  WekaClient,
+  WekaRequestError,
+  WekaValidationError,
+} from './weka.js';
+export type {
+  WekaAnswer,
+  WekaAnswerFor,
+  WekaChoiceAnswer,
+  WekaChoiceQuestion,
+  WekaClientOptions,
+  WekaDecisionRequest,
+  WekaDecisionResponse,
+  WekaDescription,
+  WekaFetch,
+  WekaJsonValue,
+  WekaNoulAnswer,
+  WekaNoulQuestion,
+  WekaQuestion,
+  WekaQuestions,
+  WekaScoreAnswer,
+  WekaScoreQuestion,
+  WekaUsage,
+} from './weka.js';
+
+/**
  * JSON-RPC client for communicating with the CLI subprocess
  */
 export { RPCClient } from './rpc/client.js';
