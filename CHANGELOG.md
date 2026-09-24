@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added a typed `WekaClient` for structured `noul`, `choice`, and `score`
+  decisions through `/v1/decisions`, including request/response validation,
+  safe HTTP errors, and a runnable example.
 - Added typed skill registry discovery and installation APIs.
 - Added typed MCP server, tool, and persisted-configuration inspection APIs.
 - Added a reproducible p95 startup benchmark with a strict 50 ms budget.
@@ -18,6 +21,7 @@
 
 ### Fixed
 
+- Updated the lint command for ESLint 10 flat-config compatibility.
 - Refreshed every bundled CLI target with concurrent-session publishing, warnings,
   collision detection, repository-drift reporting, and coordinate-tier claims.
 - Removed the 500 ms startup delay and made process startup, shutdown, and retries race-safe.

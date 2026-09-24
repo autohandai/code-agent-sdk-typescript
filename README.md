@@ -201,6 +201,50 @@ for await (const event of sdk.streamPrompt({
 await sdk.stop();
 ```
 
+## Weka structured decisions
+
+`WekaClient` calls the Autohand decision API directly, so it does not start a
+CLI subprocess. Set `AUTOHAND_AI_API_KEY` (or `AUTOHAND_API_KEY`) and pass
+structured JSON state plus one or more named `noul`, `choice`, or `score`
+questions:
+
+```typescript
+import { WekaClient } from '@autohandai/agent-sdk';
+
+const weka = new WekaClient();
+const questions = {
+  release_lane: {
+    type: 'choice',
+    instructions: 'Choose the safest release lane.',
+    criteria: {
+      stable: 'Healthy checks and low expected impact.',
+      canary: 'Healthy checks with elevated impact.',
+      blocked: 'A required check failed.',
+    },
+  },
+  risk: {
+    type: 'score',
+    instructions: 'Score release risk against the ordered anchors.',
+    criteria: ['Low risk', 'Material risk', 'Severe risk'],
+  },
+} as const;
+
+const result = await weka.decide({
+  model: 'weka',
+  state: { tests: 'passed', changedSystems: ['checkout'] },
+  questions,
+});
+
+console.log(result.answers.release_lane.choice);
+console.log(result.answers.risk.score);
+```
+
+The response is checked against the questions that were sent. Unknown choices,
+missing answers, invalid probabilities, and malformed usage data raise
+`WekaRequestError`. Invalid request data raises `WekaValidationError` before a
+network call. Configure a custom endpoint or timeout with `baseUrl` and
+`timeoutMs`.
+
 ## Configuration
 
 ### SDK Configuration

@@ -44,6 +44,7 @@ for (const file of exampleFiles) {
 
     const usesSDK = content.includes('new AutohandSDK') || content.includes('import { AutohandSDK }');
     const usesAgent = content.includes('Agent.create') || content.includes('import { Agent }');
+    const usesWeka = content.includes('new WekaClient') || content.includes('import { WekaClient }');
     const hasSdkImport = content.includes("from '../src/index.js'")
       || content.includes("from '@autohandai/agent-sdk'");
     const startsSdk = /await\s+\w+\.start\(/.test(content);
@@ -55,11 +56,11 @@ for (const file of exampleFiles) {
       hasMain: content.includes('async function main'),
       hasLifecycleStart: usesAgent
         ? content.includes('Agent.create')
-        : startsSdk,
+        : usesWeka || startsSdk,
       hasLifecycleStop: usesAgent
         ? content.includes('await agent.close')
-        : stopsSdk,
-      hasSupportedApi: usesSDK || usesAgent,
+        : usesWeka || stopsSdk,
+      hasSupportedApi: usesSDK || usesAgent || usesWeka,
       hasErrorHandling: content.includes('try {') && content.includes('catch'),
     };
 
