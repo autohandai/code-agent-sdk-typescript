@@ -2,12 +2,12 @@
   "name": "@autohandai/agent-sdk",
   "version": "1.0.3",
   "license": "Apache-2.0",
-  "description": "Autohand Code Agent SDK - CLI wrapper implementation",
+  "description": "Build coding agents on the Autohand agent loop, with any model",
   "repository": {
     "type": "git",
     "url": "https://github.com/autohandai/code-agent-sdk-typescript"
   },
-  "homepage": "https://autohand.ai/sdk/",
+  "homepage": "https://autohand.ai/code/sdk/",
   "bugs": {
     "url": "https://github.com/autohandai/code-agent-sdk-typescript/issues"
   },
@@ -63,7 +63,10 @@
     "llm",
     "agent",
     "autohand",
-    "cli-wrapper"
+    "cli-wrapper",
+    "coding-agent",
+    "ai-agent-sdk",
+    "byok"
   ],
   "engines": {
     "node": ">=18.17.0"
