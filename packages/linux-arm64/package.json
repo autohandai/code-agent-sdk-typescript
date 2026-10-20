@@ -1,0 +1,40 @@
+{
+  "name": "@autohandai/agent-sdk-linux-arm64",
+  "version": "0.9.8",
+  "description": "Autohand CLI 0.9.8 for the Agent SDK on linux-arm64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/autohandai/code-agent-sdk-typescript"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./bin/autohand": "./bin/autohand",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/cli-packages.mjs verify linux-arm64"
+  },
+  "autohandCli": {
+    "version": "0.9.8",
+    "asset": "autohand-linux-arm64",
+    "sha256": "d27bddb9729a2cd34cb9130bb8291d2a45ffa52472b6abf06782ca6c5ce63cf4",
+    "size": 95078696
+  },
+  "libc": [
+    "glibc"
+  ]
+}

@@ -45,6 +45,20 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 npm install @autohandai/agent-sdk
 ```
 
+The SDK includes Autohand CLI 0.9.8 through an optional package selected for
+your operating system and architecture. Each install downloads one CLI binary.
+Supported packages cover macOS and Linux on ARM64 and x64, and Windows on x64.
+Linux packages require glibc.
+
+To use your own CLI, pass `cliPath` or set `AUTOHAND_CLI_PATH`. The SDK looks
+for the CLI in this order: `cliPath`, then `AUTOHAND_CLI_PATH` in the session's
+`envVars`, then in its `env`, then in the inherited environment, then the
+bundled platform package, then `autohand` on PATH. A supplied path must point
+to the executable itself, without shell arguments.
+
+On Alpine or other musl-based Linux, install the CLI separately and the SDK
+will use it from PATH, or set `AUTOHAND_CLI_PATH`.
+
 ## Quick Start
 
 ### High-Level API

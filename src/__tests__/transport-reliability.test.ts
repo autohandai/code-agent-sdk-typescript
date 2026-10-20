@@ -104,6 +104,61 @@ afterEach(async () => {
 });
 
 describe('transport reliability', () => {
+  it('uses AUTOHAND_CLI_PATH for a real RPC session, including paths with spaces', async () => {
+    const original = process.env.AUTOHAND_CLI_PATH;
+    const source = await createFakeCli();
+    const cliPath = `${source} with spaces`;
+    await writeFile(cliPath, await readFile(source));
+    await chmod(cliPath, 0o755);
+    process.env.AUTOHAND_CLI_PATH = cliPath;
+    const transport = new Transport({ timeout: 1_000 });
+    try {
+      await transport.start();
+      await expect(transport.request('autohand.getState', {})).resolves.toMatchObject({ method: 'autohand.getState' });
+    } finally {
+      await transport.stop();
+      if (original === undefined) delete process.env.AUTOHAND_CLI_PATH;
+      else process.env.AUTOHAND_CLI_PATH = original;
+    }
+  });
+
+  it('uses the session AUTOHAND_CLI_PATH before the inherited environment', async () => {
+    const original = process.env.AUTOHAND_CLI_PATH;
+    const cliPath = await createFakeCli();
+    process.env.AUTOHAND_CLI_PATH = '/definitely/missing/inherited-cli';
+    const transport = new Transport({ env: { AUTOHAND_CLI_PATH: cliPath }, timeout: 1_000 });
+    try {
+      await transport.start();
+      await expect(transport.request('autohand.getState', {})).resolves.toMatchObject({ method: 'autohand.getState' });
+    } finally {
+      await transport.stop();
+      if (original === undefined) delete process.env.AUTOHAND_CLI_PATH;
+      else process.env.AUTOHAND_CLI_PATH = original;
+    }
+  });
+
+  it('keeps explicit cliPath ahead of an environment override', async () => {
+    const cliPath = await createFakeCli();
+    const transport = new Transport({ cliPath, env: { AUTOHAND_CLI_PATH: '/definitely/missing/session-cli' }, timeout: 1_000 });
+    try {
+      await transport.start();
+      await expect(transport.request('autohand.getState', {})).resolves.toMatchObject({ method: 'autohand.getState' });
+    } finally { await transport.stop(); }
+  });
+
+  it('uses the typed AUTOHAND_CLI_PATH before the generic session environment', async () => {
+    const cliPath = await createFakeCli();
+    const transport = new Transport({
+      env: { AUTOHAND_CLI_PATH: '/definitely/missing/session-cli' },
+      envVars: { AUTOHAND_CLI_PATH: cliPath },
+      timeout: 1_000,
+    });
+    try {
+      await transport.start();
+      await expect(transport.request('autohand.getState', {})).resolves.toMatchObject({ method: 'autohand.getState' });
+    } finally { await transport.stop(); }
+  });
+
   it('rejects a line waiter when the stream closes', async () => {
     const stream = new PassThrough();
     const reader = new LineReader(stream);
@@ -309,6 +364,8 @@ describe('transport reliability', () => {
     const cliPath = await createFakeCli();
     const transport = new Transport({ cliPath, timeout: 5_000 });
     await transport.start();
+    // Measure rejection after the child is accepting RPCs, excluding process startup.
+    await transport.request('autohand.getState', {});
 
     const outcome = await Promise.race([
       transport.request('test.malformed_error', {}).then(

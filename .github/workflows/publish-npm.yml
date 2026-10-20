@@ -49,32 +49,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          lfs: true
+          lfs: false
           persist-credentials: true
-
-      - name: Restore Git LFS assets
-        run: |
-          git lfs pull
-          git lfs checkout
-
-      - name: Verify bundled CLI assets
-        run: |
-          if [ ! -d cli ] || [ -z "$(find cli -maxdepth 1 -type f -print -quit)" ]; then
-            echo "::error::No bundled CLI assets were found in ./cli."
-            exit 1
-          fi
-
-          for file in cli/*; do
-            if [ ! -s "$file" ]; then
-              echo "::error::$file is empty."
-              exit 1
-            fi
-
-            if grep -a -q "git-lfs.github.com/spec/v1" "$file"; then
-              echo "::error::$file is still a Git LFS pointer. The real CLI binary was not restored."
-              exit 1
-            fi
-          done
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -89,6 +65,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Prepare verified CLI platform packages
+        run: bun run cli:prepare
 
       - name: Audit dependencies
         run: bun audit
@@ -111,17 +90,7 @@ jobs:
             | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const files = JSON.parse(input)[0].files.map(file => file.path); if (!files.includes('README.md')) { console.error('README.md is missing from the npm package.'); process.exit(1); } });"
 
       - name: Verify package size budget
-        run: |
-          package_size="$(
-            npm pack --dry-run --json \
-              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
-          )"
-          max_package_size=$((250 * 1024 * 1024))
-
-          if [ "$package_size" -gt "$max_package_size" ]; then
-            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
-            exit 1
-          fi
+        run: bun run pack:check
 
       - name: Build dependency update package
         if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
@@ -152,13 +121,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          lfs: true
+          lfs: false
           persist-credentials: true
-
-      - name: Restore Git LFS assets
-        run: |
-          git lfs pull
-          git lfs checkout
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -174,8 +138,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Prepare verified CLI platform packages
+        run: bun run cli:prepare
+
       - name: Run unit tests
         run: bun run test
+
+      - name: Verify platform packaging guards
+        run: bun run test:packaging
 
       - name: Validate examples
         run: bun run test:examples
@@ -198,13 +168,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          lfs: true
+          lfs: false
           persist-credentials: true
-
-      - name: Restore Git LFS assets
-        run: |
-          git lfs pull
-          git lfs checkout
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -220,6 +185,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Prepare verified CLI platform packages
+        run: bun run cli:prepare
 
       - name: Create canary version
         run: |
@@ -285,17 +253,10 @@ jobs:
         run: npm pack --dry-run
 
       - name: Verify package size budget
-        run: |
-          package_size="$(
-            npm pack --dry-run --json \
-              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
-          )"
-          max_package_size=$((250 * 1024 * 1024))
+        run: bun run pack:check
 
-          if [ "$package_size" -gt "$max_package_size" ]; then
-            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
-            exit 1
-          fi
+      - name: Publish verified CLI platform packages
+        run: bun run cli:publish
 
       - name: Publish canary package
         env:
@@ -319,13 +280,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          lfs: true
+          lfs: false
           persist-credentials: true
-
-      - name: Restore Git LFS assets
-        run: |
-          git lfs pull
-          git lfs checkout
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -341,6 +297,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Prepare verified CLI platform packages
+        run: bun run cli:prepare
 
       - name: Verify package version is unpublished
         run: |
@@ -398,17 +357,7 @@ jobs:
         run: npm pack --dry-run
 
       - name: Verify package size budget
-        run: |
-          package_size="$(
-            npm pack --dry-run --json \
-              | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input)[0].size));"
-          )"
-          max_package_size=$((250 * 1024 * 1024))
-
-          if [ "$package_size" -gt "$max_package_size" ]; then
-            echo "::error::Packed npm tarball is $package_size bytes, above the 250 MiB release budget."
-            exit 1
-          fi
+        run: bun run pack:check
 
       - name: Build release package artifact
         run: |
@@ -435,6 +384,9 @@ jobs:
           tag="${{ inputs.dist_tag }}"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish verified CLI platform packages
+        run: bun run cli:publish
 
       - name: Publish release package
         env:
