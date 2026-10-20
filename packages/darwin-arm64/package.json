@@ -1,0 +1,37 @@
+{
+  "name": "@autohandai/agent-sdk-darwin-arm64",
+  "version": "0.9.8",
+  "description": "Autohand CLI 0.9.8 for the Agent SDK on darwin-arm64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/autohandai/code-agent-sdk-typescript"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./bin/autohand": "./bin/autohand",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/cli-packages.mjs verify darwin-arm64"
+  },
+  "autohandCli": {
+    "version": "0.9.8",
+    "asset": "autohand-macos-arm64",
+    "sha256": "59f8a65703370993ed97073cfa37751516331d3d70b01af366ee8deacad14ea5",
+    "size": 85341760
+  }
+}

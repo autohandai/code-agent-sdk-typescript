@@ -32,9 +32,9 @@ import {
 } from './session-awareness-config.js';
 import * as path from 'path';
 import * as os from 'os';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'node:module';
 
-const currentDirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
 interface PendingRequest {
   method: string;
@@ -673,46 +673,33 @@ export class Transport {
   /**
    * Detect the CLI binary for the current platform
    * 
-   * Determines the appropriate binary name based on the operating system
-   * and architecture, then checks if it exists in the package or system PATH.
+   * Uses the effective session override, then the optional platform package,
+   * then the installed `autohand` command on PATH.
    * 
    * @returns Path to the CLI binary
-   * @throws {Error} If the platform is not supported
    * @private
    */
   private async detectCLIBinary(): Promise<string> {
+    const override = this.options.envVars?.AUTOHAND_CLI_PATH
+      ?? this.options.env?.AUTOHAND_CLI_PATH
+      ?? process.env.AUTOHAND_CLI_PATH;
+    if (override !== undefined && override.trim().length > 0) return override;
+
     const platform = os.platform();
     const arch = os.arch();
+    const supported = ((platform === 'darwin' || platform === 'linux')
+      && (arch === 'arm64' || arch === 'x64'))
+      || (platform === 'win32' && arch === 'x64');
+    if (!supported) return 'autohand';
 
-    let binaryName: string;
-
-    switch (platform) {
-      case 'darwin':
-        binaryName = arch === 'arm64' ? 'autohand-macos-arm64' : 'autohand-macos-x64';
-        break;
-      case 'linux':
-        binaryName = arch === 'arm64' ? 'autohand-linux-arm64' : 'autohand-linux-x64';
-        break;
-      case 'win32':
-        binaryName = 'autohand-windows-x64.exe';
-        break;
-      default:
-        throw new Error(`Unsupported platform: ${platform}`);
-    }
-
-    // Try to find binary in package
-    const packagePath = path.join(currentDirname, '../../cli', binaryName);
-    
-    // Try to find binary in system PATH
-    const systemPath = binaryName;
-
-    // Check if package binary exists
     try {
-      await fs.access(packagePath);
-      return packagePath;
-    } catch {
-      // Fall back to system PATH
-      return systemPath;
+      const binary = platform === 'win32' ? 'autohand.exe' : 'autohand';
+      return require.resolve(`@autohandai/agent-sdk-${platform}-${arch}/bin/${binary}`);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'MODULE_NOT_FOUND') {
+        return 'autohand';
+      }
+      throw error;
     }
   }
 

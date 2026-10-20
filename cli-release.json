@@ -1,0 +1,31 @@
+{
+  "version": "0.9.8",
+  "tag": "v0.9.8",
+  "platforms": {
+    "darwin-arm64": {
+      "asset": "autohand-macos-arm64",
+      "sha256": "59f8a65703370993ed97073cfa37751516331d3d70b01af366ee8deacad14ea5",
+      "size": 85341760
+    },
+    "darwin-x64": {
+      "asset": "autohand-macos-x64",
+      "sha256": "40e2eeaed06058d1c09290f8ea27112c81436f8a583381627116a16e33839fa6",
+      "size": 96164096
+    },
+    "linux-arm64": {
+      "asset": "autohand-linux-arm64",
+      "sha256": "d27bddb9729a2cd34cb9130bb8291d2a45ffa52472b6abf06782ca6c5ce63cf4",
+      "size": 95078696
+    },
+    "linux-x64": {
+      "asset": "autohand-linux-x64",
+      "sha256": "e58b4ef9076d960e56cbfc37267f0c0ecba14881ccdf9ff8ecc3360101bcb00d",
+      "size": 95081952
+    },
+    "win32-x64": {
+      "asset": "autohand-windows-x64.exe",
+      "sha256": "66d3ae4795b1fe1ca9767123ea2ffded980d7c774781f126a7cc8c286063b4ef",
+      "size": 113773056
+    }
+  }
+}

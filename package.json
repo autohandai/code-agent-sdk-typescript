@@ -1,6 +1,6 @@
 {
   "name": "@autohandai/agent-sdk",
-  "version": "1.0.3",
+  "version": "1.1.1",
   "license": "Apache-2.0",
   "description": "Autohand Code Agent SDK - CLI wrapper implementation",
   "repository": {
@@ -25,7 +25,6 @@
   "files": [
     "dist",
     "!dist/__tests__",
-    "cli",
     "README.md",
     "CHANGELOG.md",
     "docs/autoresearch.md",
@@ -56,7 +55,13 @@
     "benchmark:startup": "bun run build && node scripts/benchmark-startup.mjs",
     "build:example:structured-json": "node scripts/build-examples.mjs examples/25-structured-json.ts",
     "build:examples": "node scripts/build-examples.mjs",
-    "prepublishOnly": "bun run typecheck && bun run test && bun run build && bun run typecheck:examples && bun run test:examples && bun run build:examples && bun run lint"
+    "prepublishOnly": "bun run typecheck && bun run test && bun run test:packaging && bun run build && bun run typecheck:examples && bun run test:examples && bun run build:examples && bun run lint",
+    "cli:prepare": "node scripts/cli-packages.mjs prepare",
+    "cli:verify": "node scripts/cli-packages.mjs verify",
+    "cli:publish": "node scripts/cli-packages.mjs publish",
+    "pack:check": "node scripts/check-package.mjs",
+    "test:package": "bun run build && node scripts/test-package.mjs",
+    "test:packaging": "bun test tests/cli-packages.test.mjs"
   },
   "keywords": [
     "sdk",
@@ -83,5 +88,15 @@
     "globals": "^17",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "optionalDependencies": {
+    "@autohandai/agent-sdk-darwin-arm64": "0.9.8",
+    "@autohandai/agent-sdk-darwin-x64": "0.9.8",
+    "@autohandai/agent-sdk-linux-arm64": "0.9.8",
+    "@autohandai/agent-sdk-linux-x64": "0.9.8",
+    "@autohandai/agent-sdk-win32-x64": "0.9.8"
+  }
 }

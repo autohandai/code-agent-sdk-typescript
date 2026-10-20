@@ -484,31 +484,32 @@ describe('session awareness documentation', () => {
     expect(packageJson.files).toContain('examples/28-session-awareness.ts');
   });
 
-  it('bundles verified CLI artifacts with session awareness', async () => {
-    const buildInfo = JSON.parse(
-      await fs.readFile(path.join(process.cwd(), 'cli', 'BUILD_INFO.json'), 'utf8'),
-    ) as {
-      sourceCommit: string;
-      features: string[];
-      sha256: Record<string, string>;
+  it('pins each optional CLI package to verified release artifacts', async () => {
+    const release = JSON.parse(await fs.readFile('cli-release.json', 'utf8')) as {
+      version: string;
+      platforms: Record<string, { sha256: string; size: number }>;
     };
-
-    expect(buildInfo.sourceCommit).toMatch(/^[a-f0-9]{40}$/);
-    expect(buildInfo.features).toContain('concurrent-session-awareness');
-    expect(Object.keys(buildInfo.sha256).sort()).toEqual([
-      'autohand-linux-arm64',
-      'autohand-linux-x64',
-      'autohand-macos-arm64',
-      'autohand-macos-x64',
-      'autohand-windows-x64.exe',
+    const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8')) as {
+      files: string[];
+      optionalDependencies: Record<string, string>;
+    };
+    expect(release.version).toBe('0.9.8');
+    expect(Object.keys(release.platforms).sort()).toEqual([
+      'darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-x64',
     ]);
-    for (const [artifact, expectedHash] of Object.entries(buildInfo.sha256)) {
-      expect(expectedHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(packageJson.files).not.toContain('cli');
+    for (const [target, expected] of Object.entries(release.platforms)) {
+      expect(packageJson.optionalDependencies[`@autohandai/agent-sdk-${target}`]).toBe(release.version);
+      expect(expected.sha256).toMatch(/^[a-f0-9]{64}$/);
+      const artifact = path.join('packages', target, 'bin', target.startsWith('win32') ? 'autohand.exe' : 'autohand');
       const hash = createHash('sha256');
-      for await (const chunk of createReadStream(path.join(process.cwd(), 'cli', artifact))) {
+      let size = 0;
+      for await (const chunk of createReadStream(artifact)) {
+        size += chunk.length;
         hash.update(chunk);
       }
-      expect(hash.digest('hex')).toBe(expectedHash);
+      expect(size).toBe(expected.size);
+      expect(hash.digest('hex')).toBe(expected.sha256);
     }
   });
 });

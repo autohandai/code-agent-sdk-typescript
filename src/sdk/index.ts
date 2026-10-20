@@ -260,11 +260,11 @@ export class AutohandSDK {
    * Create a new AutohandSDK instance
    * 
    * The CLI binary is automatically detected based on platform/architecture
-   * from the bundled binaries. No manual configuration needed for production use.
+   * from its optional platform package, or from `autohand` on PATH.
    * 
    * @param config - Configuration options for the SDK (all optional)
    * @param config.cwd - Working directory for the CLI (defaults to process.cwd())
-   * @param config.cliPath - Override path to CLI binary (auto-detected from bundled binaries if not provided)
+   * @param config.cliPath - Override path to CLI binary (takes precedence over AUTOHAND_CLI_PATH and platform detection)
    * @param config.debug - Enable debug logging (default: false)
    * @param config.timeout - Request timeout in milliseconds (default: 300000)
    * @param config.model - Model to use for agent execution

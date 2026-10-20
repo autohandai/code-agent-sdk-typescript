@@ -1,0 +1,37 @@
+{
+  "name": "@autohandai/agent-sdk-win32-x64",
+  "version": "0.9.8",
+  "description": "Autohand CLI 0.9.8 for the Agent SDK on win32-x64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/autohandai/code-agent-sdk-typescript"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./bin/autohand.exe": "./bin/autohand.exe",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/cli-packages.mjs verify win32-x64"
+  },
+  "autohandCli": {
+    "version": "0.9.8",
+    "asset": "autohand-windows-x64.exe",
+    "sha256": "66d3ae4795b1fe1ca9767123ea2ffded980d7c774781f126a7cc8c286063b4ef",
+    "size": 113773056
+  }
+}

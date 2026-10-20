@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Ship the checksum-verified CLI 0.9.8 release in five optional platform packages so each install downloads only its matching binary.
+- Honor `AUTOHAND_CLI_PATH` from the session or inherited environment, preserve explicit `cliPath` precedence, and fall back to `autohand` on PATH.
+- Prepare and verify platform packages from pinned release checksums without Git LFS, and publish them before the SDK.
+
 ## Unreleased
 
 ### Added
