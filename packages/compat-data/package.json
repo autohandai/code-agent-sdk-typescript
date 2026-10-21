@@ -1,0 +1,11 @@
+{
+  "name": "@autohandai/agent-compat-data",
+  "version": "1.0.0",
+  "description": "Shared Autohand agent tool names and Claude compatibility mappings",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.js" } },
+  "files": ["index.js", "index.d.ts", "LICENSE"],
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "https://github.com/autohandai/code-agent-sdk-typescript" }
+}

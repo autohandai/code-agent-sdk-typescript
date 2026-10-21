@@ -72,8 +72,8 @@ export async function prepareSessionAwarenessConfig(
   };
 }
 
-async function resolveConfigPath(
-  source: SessionAwarenessConfigSource,
+export async function resolveConfigPath(
+  source: Omit<SessionAwarenessConfigSource, 'awareness'>,
 ): Promise<string | undefined> {
   const explicit = source.configPath
     ?? source.envVars?.AUTOHAND_CONFIG
@@ -133,7 +133,7 @@ async function findConfigFiles(directory: string): Promise<string[]> {
   return existing;
 }
 
-async function parseConfig(configPath: string): Promise<Record<string, unknown>> {
+export async function parseConfig(configPath: string): Promise<Record<string, unknown>> {
   try {
     const content = await fs.readFile(configPath, 'utf8');
     const extension = path.extname(configPath).toLowerCase();

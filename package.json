@@ -19,7 +19,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./claude": {
+      "types": "./dist/compat/claude/index.d.ts",
+      "import": "./dist/compat/claude/index.js"
+    }
   },
   "sideEffects": false,
   "files": [
@@ -38,7 +42,8 @@
     "examples/29-weka-decisions.ts",
     "examples/session-awareness",
     "tsconfig.examples.json",
-    "LICENSE"
+    "LICENSE",
+    "COMPAT.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -74,10 +79,16 @@
     "node": ">=18.17.0"
   },
   "dependencies": {
+    "@autohandai/agent-compat-data": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "es-module-lexer": "1.7.0",
     "toml": "^5.0.0",
-    "yaml": "^2.8.4"
+    "yaml": "^2.8.4",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.306",
+    "@anthropic-ai/sdk": "0.93.0",
     "@eslint/js": "^10",
     "@types/bun": "^1.4.0",
     "@types/node": "^26.2.0",
@@ -98,5 +109,8 @@
     "@autohandai/agent-sdk-linux-arm64": "0.9.8",
     "@autohandai/agent-sdk-linux-x64": "0.9.8",
     "@autohandai/agent-sdk-win32-x64": "0.9.8"
+  },
+  "bin": {
+    "autohand-agent-sdk": "./dist/cli.js"
   }
 }

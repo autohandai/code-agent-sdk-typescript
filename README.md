@@ -4,6 +4,10 @@ Autohand Code Agent SDK - CLI wrapper implementation for TypeScript.
 
 **Beta:** this SDK is actively evolving while the Agent SDK APIs stabilize. Pin versions in production and review release notes before upgrading.
 
+The `/claude` compatibility entry point is under development and has not been
+published. Read [COMPAT.md](COMPAT.md) for the implemented surface, official
+example results and runtime blockers before evaluating this branch.
+
 ## Overview
 
 This SDK provides a TypeScript wrapper around the Autohand CLI binary, enabling programmatic access to Autohand's autonomous coding agent capabilities via JSON-RPC 2.0 protocol.

@@ -8,6 +8,13 @@
 
 ## Unreleased
 
+- Add an unreleased `/claude` facade, ordered message reduction, explicit
+  credential/model mapping, native file-batch application and resource cleanup.
+- Add schema-validated SDK-hosted MCP tools and a dry-run import migration
+  command. See `COMPAT.md` for unsupported constraints and release blockers.
+- Preserve global JSON-RPC startup errors instead of replacing authentication
+  diagnostics with a generic process-exit error.
+
 ### Added
 
 - Added a typed `WekaClient` for structured `noul`, `choice`, and `score`
