@@ -84,6 +84,7 @@ export type JsonRpcParams = Record<string, unknown> | unknown[];
  */
 export type BuiltInProviderName =
   | 'autohandai'
+  | 'anthropic'
   | 'openrouter'
   | 'ollama'
   | 'llamacpp'
@@ -189,6 +190,7 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'azure':
       validateAzureConfig(config);
       break;
+    case 'anthropic':
     case 'zai':
     case 'sakana':
     case 'openrouter':
@@ -1134,6 +1136,8 @@ This file helps AI assistants understand your project structure, conventions, an
 }
 
 export interface SDKConfig {
+  /** Explicit CLI configuration file. The file is read by the child process. */
+  configPath?: string;
   // ============================================================================
   // Basic Configuration
   // ============================================================================

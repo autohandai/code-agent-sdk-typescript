@@ -1,0 +1,22 @@
+{
+  "retrieved": "2026-10-21",
+  "modification": "Only package specifiers replaced; prompts, options and message consumers unchanged.",
+  "examples": [
+    {
+      "name": "quickstart",
+      "source": "https://code.claude.com/docs/en/agent-sdk/quickstart",
+      "section": "Build an agent that finds and fixes bugs / TypeScript",
+      "originalSha256": "841d251571c111fb9cc6df5f8b58965d3dbe5f0e19b8d1b8a2f76a205c30338e",
+      "modifiedSha256": "3376ed12788bcb0685d15a94f14aedb947664912992b317d3a845efa29e08f53"
+    },
+    {
+      "name": "hello-world",
+      "source": "https://github.com/anthropics/claude-agent-sdk-demos",
+      "commit": "826b268506a5f3707623c9e6140b200befcbebae",
+      "path": "hello-world/hello-world.ts",
+      "license": "MIT, as stated in the upstream README",
+      "originalSha256": "a04b15c372a1b8c75391908710835cd8204a15d1c05d3e3f644e0ee1174199f3",
+      "modifiedSha256": "adb987d7a1c139d02404d94e75eb9c3e90aea901912f8fd3be807c0f9c64569a"
+    }
+  ]
+}

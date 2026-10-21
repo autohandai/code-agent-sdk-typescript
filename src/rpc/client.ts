@@ -282,6 +282,7 @@ export class RPCClient {
     }
 
     const transportOptions: TransportOptions = {};
+    if (config.configPath !== undefined) transportOptions.configPath = config.configPath;
 
     if (config.cwd !== undefined) transportOptions.cwd = config.cwd;
     if (config.cliPath !== undefined) transportOptions.cliPath = config.cliPath;
