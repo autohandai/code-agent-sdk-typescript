@@ -76,7 +76,7 @@ export async function prepareOptions(options: Options = {}): Promise<PreparedOpt
     .flatMap(toNativeToolPatterns).filter(tool => !writeCapabilities.has(tool)).map(tool => `${tool}:*`);
   const baseAllow = 'allowList' in permissions && Array.isArray(permissions.allowList) ? permissions.allowList : [];
   const merged = {
-    ...original, provider: auth.provider,
+    ...original, auth: { token: auth.accountApiKey }, provider: auth.provider,
     [auth.provider]: { ...existingProvider, model: selected.model,
       ...(auth.apiKey !== undefined ? { apiKey: auth.apiKey } : {}),
       ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),

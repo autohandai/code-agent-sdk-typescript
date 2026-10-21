@@ -32,6 +32,7 @@
     "README.md",
     "CHANGELOG.md",
     "docs/autoresearch.md",
+    "docs/claude-compat.md",
     "docs/agent-cli-comparison.md",
     "docs/session-awareness.md",
     "docs/reliability-and-performance.md",

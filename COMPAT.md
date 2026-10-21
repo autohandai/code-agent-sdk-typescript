@@ -8,12 +8,41 @@ Baseline: Claude SDK `0.3.306`, Autohand SDK main `c820a3d`, CLI main
 `86c30f0802f433ceaa47cc21b42989d2a5672cbe`, released CLI `0.9.8`.
 The new entry point is `@autohandai/agent-sdk/claude`.
 
+## Authentication policy
+
+Every compatibility session requires an Autohand account, including BYOK and
+local-model sessions. The migration target is one import change plus
+`AUTOHAND_API_KEY`, available free with a verified account at
+<https://console.autohand.ai/api-keys>. For Anthropic BYOK, keep the existing
+`ANTHROPIC_API_KEY` as well; it is used only for Anthropic inference.
+`AUTOHAND_AI_API_KEY` remains a legacy alias for the Autohand account key;
+`AUTOHAND_API_KEY` takes precedence when both are set.
+
+Missing or blank account credentials reject before the CLI is spawned:
+
+> Get a free Autohand API key at https://console.autohand.ai/api-keys and set AUTOHAND_API_KEY.
+
+Provider credentials and account credentials are resolved independently. The
+temporary private CLI configuration uses only the Autohand key for account
+authentication. An Anthropic key is never copied into either Autohand key
+environment variable or into account authentication. Existing CLI auth is
+unchanged. `options.apiKey` is a provider credential and does not replace the
+required Autohand account environment key.
+
+With an Anthropic key present, an unset model or a Claude model selects
+Anthropic BYOK. An explicit hosted model such as `fantail` selects Autohand;
+an explicit provider or supported model prefix selects that provider.
+
+Q-0061 remains open with Igor. Accountless BYOK/local behavior is not part of
+the current contract; it would require a separate decision with F-0091's
+local-only mode. See [the unreleased migration notes](docs/claude-compat.md).
+
 ## Release blockers
 
-1. A clean BYOK or local-model session still requires an Autohand account. The
-   released CLI rejects startup before contacting the model provider. Product
-   policy must decide whether accountless BYOK/local sessions are supported.
-   An Anthropic key must never be copied into an Autohand credential field.
+1. The current account-required contract has preflight, subprocess and
+   released-CLI/local-HTTP fixture proof. Production API-key authentication and
+   live-model migration have not been verified. An accountless product decision
+   is not required to implement the current account-required contract.
 2. Permission requests do not carry full input and a tool-use ID before
    authorization. CLI main emits `tool_start` after canonical authorization.
    `canUseTool`, updated input, scoped preapproval and JS hooks need a correlated
@@ -23,7 +52,8 @@ The new entry point is `@autohandai/agent-sdk/claude`.
    Exact requested-tool preapproval requires a CLI policy extension.
    `acceptEdits` and bare file-tool preapproval are rejected before execution
    rather than granting these additional capabilities.
-4. Dollar budgets are explicitly rejected by CLI main. Cost, exact main-agent
+4. `--max-cost` and `maxBudgetUsd` are unsupported and explicitly rejected;
+   request/token caps are not dollar budgets. Cost, exact main-agent
    turns and per-model usage are not present in the required RPC stream.
 5. Five pinned CLI platform packages and the shared mapping package are not
    published. Local registry installation is proof of packaging, not an npm
@@ -34,12 +64,12 @@ The new entry point is `@autohandai/agent-sdk/claude`.
 
 | Surface | Current implementation | Proof boundary |
 | --- | --- | --- |
-| `query()` | Lazy async iterator, one CLI process, init, assistant/tool messages and result | Subprocess fixtures; released CLI/provider fixture quickstart |
+| `query()` | Lazy async iterator, one CLI process, init, assistant/tool messages and result | Subprocess fixtures; separate released-CLI mutation smoke with account/provider fixtures |
 | Streaming input | Sequential text user messages in one session | Subprocess fixtures; attachments rejected |
 | Lifecycle | Interrupt, early consumer exit, abort, close, stalled input cancellation | Subprocess fixtures |
 | Errors | Global CLI startup diagnostics preserved; reported execution errors retained | Transport and reducer tests |
 | File changes | Apply the canonically authorized RPC change batch before returning success; reject batches in plan mode | Actual file edit using released CLI with explicit bypass consent; failed/malformed batch tests |
-| Authentication | Scoped env, canonical `AUTOHAND_AI_API_KEY`, alias `AUTOHAND_API_KEY`, Anthropic BYOK selection | Resolution tests; clean BYOK runtime remains blocked by account gate |
+| Authentication | Required `AUTOHAND_API_KEY`, legacy `AUTOHAND_AI_API_KEY` alias; separate Anthropic BYOK credentials; missing account key rejects before spawn | Public-query/subprocess tests; released CLI with local HTTP fixtures verifies account/provider credential isolation; no production-key proof |
 | Models | Public Claude aliases with native Anthropic; hosted Fantail; explicit provider/local prefixes | Selection tests; no live provider inference proof |
 | `allowedTools` | Non-file bare aliases preapprove native capabilities; do not narrow advertised tools | File-tool preapproval rejected; scoped preapproval warns and remains unapproved; exact requested-tool policy blocked |
 | `disallowedTools` / `tools` | Native deny scope / exclusive tool availability | Configuration tests; distinct from preapproval |
@@ -90,7 +120,9 @@ explicit bypass consent and local account/model fixtures. That smoke is not an
 official example and does not count toward the acceptance total.
 
 There is no clean one-env-var migration, production authentication or live-model
-proof. No live-provider official example has been verified. The full official
+proof from the official examples. The documented target is one new Autohand
+account environment variable, retaining an existing BYOK key where applicable.
+No live-provider official example has been verified. The full official
 demo collection has not been assessed.
 
 Reproduce after `bun run build`:
@@ -104,7 +136,7 @@ not a substitute for the release acceptance gate.
 
 ## Remaining phases
 
-Phase 1 is partial pending the account decision, exact permission mapping,
+Phase 1 is partial pending production-account proof, exact permission mapping,
 shared CLI alias-table adoption and real persisted-session/subagent proof.
 
 Phase 2 has working SDK-hosted MCP tools and the import codemod. Permission

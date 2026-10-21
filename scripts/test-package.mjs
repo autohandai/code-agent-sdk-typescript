@@ -96,7 +96,7 @@ try {
   const source = `import { Agent, AutohandSDK } from '@autohandai/agent-sdk';
 import {query,tool,createSdkMcpServer} from '@autohandai/agent-sdk/claude';
 import {z} from 'zod';
-const options={provider:'openrouter',apiKey:'package-test-only',baseUrl:${JSON.stringify(`${base}/provider`)},timeout:15000,env:{AUTOHAND_AUTH_API_URL:${JSON.stringify(`${base}/auth`)},AUTOHAND_API_URL:${JSON.stringify(base)},AUTOHAND_HOME:${JSON.stringify(home)},OPENROUTER_API_KEY:'package-test-only',AUTOHAND_NO_UPDATE_CHECK:'1',AUTOHAND_SKIP_VERSION_CHECK:'1',AUTOHAND_TELEMETRY_DISABLED:'1'}};
+const options={provider:'openrouter',apiKey:'package-test-only',baseUrl:${JSON.stringify(`${base}/provider`)},timeout:15000,env:{AUTOHAND_API_KEY:${JSON.stringify(`ahc_${'a'.repeat(43)}`)},AUTOHAND_AUTH_API_URL:${JSON.stringify(`${base}/auth`)},AUTOHAND_API_URL:${JSON.stringify(base)},AUTOHAND_HOME:${JSON.stringify(home)},OPENROUTER_API_KEY:'package-test-only',AUTOHAND_NO_UPDATE_CHECK:'1',AUTOHAND_SKIP_VERSION_CHECK:'1',AUTOHAND_TELEMETRY_DISABLED:'1'}};
 const agent=await Agent.create(options);await agent.close();
 const sdk=new AutohandSDK(options);try{await sdk.start();const state=await sdk.getState();if(!state||typeof state!=='object')throw new Error('Missing real CLI RPC state');console.log('Agent.create and real CLI RPC passed')}finally{await sdk.close()}
 const greeting=tool('hello','Greet',{name:z.string()},async({name})=>({content:[{type:'text',text:name}]}));

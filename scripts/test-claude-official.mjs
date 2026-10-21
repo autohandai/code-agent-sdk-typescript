@@ -11,17 +11,37 @@ const directory = await mkdtemp(join(tmpdir(), 'autohand-official-compat-'));
 const original = 'def calculate_average(numbers):\n    return sum(numbers) / len(numbers)\n\ndef get_user_name(user):\n    return user["name"].upper()\n';
 const fixed = 'def calculate_average(numbers):\n    return sum(numbers) / len(numbers) if numbers else 0\n\ndef get_user_name(user):\n    return (user or {}).get("name", "").upper()\n';
 let calls = 0;
+const accountKey = `ahc_${'a'.repeat(43)}`;
+const providerKey = 'provider-fixture';
+let accountAuthRequests = 0;
+let providerCredentialRequests = 0;
+const credentialViolations = [];
 const paths = [];
 const toolResults = [];
 const server = createServer(async (request, response) => {
   paths.push(request.url);
   response.setHeader('Content-Type', 'application/json');
+  let body = ''; for await (const chunk of request) body += chunk;
+  const headers = JSON.stringify(request.headers);
+  if (request.url !== '/v1/messages' && (headers.includes(providerKey) || body.includes(providerKey))) {
+    credentialViolations.push('Anthropic credential reached the control plane');
+    response.writeHead(401); response.end('{}'); return;
+  }
   if (request.url === '/auth/me') {
+    if (request.headers.authorization !== `Bearer ${accountKey}`) {
+      credentialViolations.push('Account authentication used the wrong credential');
+      response.writeHead(401); response.end('{}'); return;
+    }
+    accountAuthRequests += 1;
     response.end(JSON.stringify({ user: { id: 'compat-fixture', email: 'compat@example.test', name: 'Compatibility fixture' } }));
     return;
   }
   if (request.url !== '/v1/messages') { response.end(JSON.stringify({ data: [] })); return; }
-  let body = ''; for await (const chunk of request) body += chunk;
+  if (request.headers['x-api-key'] !== providerKey || headers.includes(accountKey) || body.includes(accountKey)) {
+    credentialViolations.push('Provider inference used the wrong credential');
+    response.writeHead(401); response.end('{}'); return;
+  }
+  providerCredentialRequests += 1;
   for (const message of JSON.parse(body).messages ?? []) for (const block of Array.isArray(message.content) ? message.content : []) {
     if (block.type === 'tool_result') toolResults.push(block);
   }
@@ -42,14 +62,15 @@ try {
   await mkdir(join(directory, 'agent'));
   await writeFile(join(directory, 'utils.py'), original);
   const config = join(home, 'config.json');
-  await writeFile(config, JSON.stringify({ auth: { token: `ahc_${'a'.repeat(43)}` }, provider: 'anthropic',
-    anthropic: { model: 'claude-sonnet-5', apiKey: 'provider-fixture', baseUrl: base },
+  await writeFile(config, JSON.stringify({ provider: 'anthropic',
+    anthropic: { model: 'claude-sonnet-5', apiKey: providerKey, baseUrl: base },
     telemetry: { enabled: false }, network: { maxRetries: 0 } }), { mode: 0o600 });
   const env = { ...process.env, AUTOHAND_HOME: home, AUTOHAND_CONFIG: config,
     AUTOHAND_CLI_PATH: resolve(root, 'packages', `${process.platform}-${process.arch}`, 'bin', process.platform === 'win32' ? 'autohand.exe' : 'autohand'),
     AUTOHAND_AUTH_API_URL: `${base}/auth`, AUTOHAND_API_URL: base,
-    ANTHROPIC_API_KEY: 'provider-fixture', AUTOHAND_SKIP_UPDATE_CHECK: '1', AUTOHAND_TELEMETRY_DISABLED: '1' };
-  delete env.AUTOHAND_AI_API_KEY; delete env.AUTOHAND_API_KEY;
+    AUTOHAND_API_KEY: accountKey, ANTHROPIC_API_KEY: providerKey,
+    AUTOHAND_SKIP_UPDATE_CHECK: '1', AUTOHAND_TELEMETRY_DISABLED: '1' };
+  delete env.AUTOHAND_AI_API_KEY;
   const examples = [];
   for (const name of ['quickstart', 'hello-world']) {
     const file = join(root, 'tests/compat/official', `${name}.ts`);
@@ -76,6 +97,8 @@ try {
   // contact the explicit local auth fixture.
   const report = { proof: 'official rejection checks plus a separate released-CLI 0.9.8 mutation smoke using local account/model fixtures',
     cleanAccountlessMigration: false, liveProvider: false,
+    authSeparation: { passed: credentialViolations.length === 0 && accountAuthRequests > 0 && providerCredentialRequests > 0,
+      accountAuthRequests, providerCredentialRequests, violations: credentialViolations },
     passed: examples.filter(example => example.success).length, total: examples.length,
     providerRequests: officialProviderRequests, officialPaths,
     mutationSmoke,

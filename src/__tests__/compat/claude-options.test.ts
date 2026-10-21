@@ -4,7 +4,7 @@ import { prepareOptions } from '../../compat/claude/options.js';
 
 describe('Claude options runtime mapping', () => {
   it('writes private provider and permission configuration without narrowing allowedTools', async () => {
-    const prepared = await prepareOptions({ env: { ANTHROPIC_API_KEY: 'test-key' }, model: 'sonnet', settingSources: [],
+    const prepared = await prepareOptions({ env: { AUTOHAND_API_KEY: 'account-key', ANTHROPIC_API_KEY: 'test-key' }, model: 'sonnet', settingSources: [],
       allowedTools: ['Read', 'Bash(npm test:*)'], disallowedTools: ['Write'], permissionMode: 'dontAsk' });
     try {
       const config = JSON.parse(await readFile(prepared.config.configPath ?? '', 'utf8'));

@@ -10,7 +10,15 @@ async function cliFixture(mode = 'normal') {
   const cliPath = join(cwd, 'cli.cjs'); const log = join(cwd, 'requests.jsonl');
   await writeFile(cliPath, `#!/usr/bin/env node
 const fs=require('node:fs');const {createInterface}=require('node:readline');
+fs.writeFileSync(${JSON.stringify(join(cwd, 'started'))},'started');
 const log=${JSON.stringify(log)};const mode=${JSON.stringify(mode)};let model='fantail';let sessionId='session-fixture';
+if(mode==='auth-boundary'){
+ const args=process.argv.slice(2);const config=JSON.parse(fs.readFileSync(args[args.indexOf('--config')+1],'utf8'));
+ fs.writeFileSync(${JSON.stringify(join(cwd, 'auth-boundary.json'))},JSON.stringify({
+  accountToken:config.auth?.token,accountEnv:process.env.AUTOHAND_API_KEY,legacyAccountEnv:process.env.AUTOHAND_AI_API_KEY,
+  anthropicEnv:process.env.ANTHROPIC_API_KEY,providerKey:config.anthropic?.apiKey,hostedKey:config.autohandai?.apiKey,
+ }));
+}
 const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');
 const emit=(type,params)=>send({jsonrpc:'2.0',method:'autohand.'+type,params:{timestamp:new Date().toISOString(),...params}});
 for(const event of ['SIGTERM','SIGINT'])process.on(event,()=>process.exit(0));
@@ -43,6 +51,47 @@ for(const event of ['SIGTERM','SIGINT'])process.on(event,()=>process.exit(0));
 afterEach(async () => { await Promise.all(folders.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
 describe('query facade over a real JSON-RPC subprocess', () => {
+  it('requires an Autohand account key before spawning even with an Anthropic key', async () => {
+    const fixture = await cliFixture();
+    const q = query({ prompt: 'Hello', options: { cwd: fixture.cwd, cliPath: fixture.cliPath, settingSources: [], model: 'sonnet', env: {
+      AUTOHAND_API_KEY: undefined, AUTOHAND_AI_API_KEY: undefined, ANTHROPIC_API_KEY: 'provider-only-fixture',
+    } } });
+    try {
+      await expect(q.initializationResult()).rejects.toThrow('Get a free Autohand API key at https://console.autohand.ai/api-keys and set AUTOHAND_API_KEY.');
+      await expect(readFile(join(fixture.cwd, 'started'), 'utf8')).rejects.toThrow(/ENOENT/);
+    } finally { await q.close(); }
+  });
+
+  it('keeps Anthropic BYOK credentials out of Autohand account authentication in the child process', async () => {
+    const fixture = await cliFixture('auth-boundary');
+    const messages = [];
+    for await (const message of query({ prompt: 'Hello', options: {
+      cwd: fixture.cwd, cliPath: fixture.cliPath, settingSources: [], model: 'sonnet',
+      env: { AUTOHAND_API_KEY: 'account-fixture', AUTOHAND_AI_API_KEY: 'legacy-account-fixture', ANTHROPIC_API_KEY: 'provider-fixture' },
+    } })) messages.push(message);
+    expect(messages[0]).toMatchObject({ type: 'system', apiKeySource: 'ANTHROPIC_API_KEY' });
+    expect(JSON.parse(await readFile(join(fixture.cwd, 'auth-boundary.json'), 'utf8'))).toEqual({
+      accountToken: 'account-fixture', accountEnv: 'account-fixture', legacyAccountEnv: 'account-fixture',
+      anthropicEnv: 'provider-fixture', providerKey: 'provider-fixture',
+    });
+  });
+
+  it('rejects known Anthropic credentials placed in Autohand account or hosted-provider fields', async () => {
+    for (const useProviderOption of [false, true]) {
+      const fixture = await cliFixture();
+      const q = query({ prompt: 'Hello', options: {
+        cwd: fixture.cwd, cliPath: fixture.cliPath, settingSources: [], provider: 'autohandai', model: 'fantail',
+        ...(useProviderOption ? { apiKey: 'provider-fixture' } : {}),
+        env: { AUTOHAND_API_KEY: useProviderOption ? 'account-fixture' : 'provider-fixture',
+          AUTOHAND_AI_API_KEY: undefined, ANTHROPIC_API_KEY: 'provider-fixture' },
+      } });
+      try {
+        await expect(q.initializationResult()).rejects.toThrow(/ANTHROPIC_API_KEY is a provider credential/);
+        await expect(readFile(join(fixture.cwd, 'started'), 'utf8')).rejects.toThrow(/ENOENT/);
+      } finally { await q.close(); }
+    }
+  });
+
   it('emits init first and result last and closes the subprocess and config', async () => {
     const { log, ...fixture } = await cliFixture(); const messages = [];
     for await (const message of query({ prompt: 'Hello', options: { ...fixture, settingSources: [] } })) messages.push(message);

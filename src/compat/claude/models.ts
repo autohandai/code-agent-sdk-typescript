@@ -1,9 +1,11 @@
 import { claudeModelAliases } from '@autohandai/agent-compat-data';
 import type { ProviderName } from '../../types/index.js';
 import { ClaudeCompatibilityError } from '../../errors/claude-compat.js';
+import { requireAutohandAccountKey, validateAutohandCredential } from '../../validation/claude-compat.js';
 import type { Options } from './types.js';
 
 export interface Authentication {
+  accountApiKey: string;
   provider: ProviderName;
   apiKey?: string;
   source: string;
@@ -13,24 +15,25 @@ export interface Authentication {
 export function resolveAuthentication(options: Options, inherited: NodeJS.ProcessEnv = process.env): Authentication {
   const env = Object.fromEntries(Object.entries({ ...inherited, ...options.env })
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+  const accountApiKey = requireAutohandAccountKey(env);
   const present = (value: string | undefined): string | undefined => (value?.trim().length ?? 0) > 0 ? value : undefined;
-  const key = present(options.apiKey) ?? present(env.AUTOHAND_AI_API_KEY) ?? present(env.AUTOHAND_API_KEY);
-  const provider = options.provider ?? (key !== undefined ? 'autohandai' : present(env.ANTHROPIC_API_KEY) !== undefined ? 'anthropic' : 'autohandai');
+  const accountSource = present(env.AUTOHAND_API_KEY) !== undefined ? 'AUTOHAND_API_KEY' : 'AUTOHAND_AI_API_KEY';
+  const wantsClaude = options.model === undefined || options.model.startsWith('claude-') || Object.hasOwn(claudeModelAliases, options.model);
+  const provider = options.provider ?? (wantsClaude && present(env.ANTHROPIC_API_KEY) !== undefined ? 'anthropic' : 'autohandai');
   const providerEnv: Partial<Record<ProviderName, string>> = {
     anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', openrouter: 'OPENROUTER_API_KEY',
     deepseek: 'DEEPSEEK_API_KEY', xai: 'XAI_API_KEY', cerebras: 'CEREBRAS_API_KEY',
     nvidia: 'NVIDIA_API_KEY', zai: 'ZAI_API_KEY', vertexai: 'GOOGLE_API_KEY',
   };
   const source = present(options.apiKey) !== undefined ? 'apiKey' : provider === 'autohandai'
-    ? present(env.AUTOHAND_AI_API_KEY) !== undefined ? 'AUTOHAND_AI_API_KEY' : present(env.AUTOHAND_API_KEY) !== undefined ? 'AUTOHAND_API_KEY' : 'account'
+    ? accountSource
     : providerEnv[provider] ?? 'configuration';
-  const apiKey = options.apiKey ?? (provider === 'autohandai' ? key : env[source]);
-  if (provider === 'autohandai' && apiKey !== undefined) {
-    // These are aliases for the same vendor. Foreign provider keys stay separate.
-    env.AUTOHAND_AI_API_KEY = apiKey;
-    env.AUTOHAND_API_KEY = apiKey;
-  }
-  return { provider, source, env, ...(apiKey !== undefined ? { apiKey } : {}) };
+  const apiKey = present(options.apiKey) ?? (provider === 'autohandai' ? accountApiKey : present(env[source]));
+  if (provider === 'autohandai' && apiKey !== undefined) validateAutohandCredential(apiKey, env);
+  // Account credentials remain independent of the selected inference provider.
+  env.AUTOHAND_API_KEY = accountApiKey;
+  env.AUTOHAND_AI_API_KEY = accountApiKey;
+  return { accountApiKey, provider, source, env, ...(apiKey !== undefined ? { apiKey } : {}) };
 }
 
 export function resolveModel(model: string | undefined, auth: Authentication): { provider: ProviderName; model: string } {

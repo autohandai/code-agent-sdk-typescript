@@ -8,15 +8,15 @@ const stamp = '2026-10-21T00:00:00.000Z';
 
 describe('Claude compatibility foundation', () => {
   it('honors scoped env and the canonical/alias Autohand key without mutating process env', () => {
-    const env = { AUTOHAND_AI_API_KEY: 'canonical', AUTOHAND_API_KEY: 'alias', ANTHROPIC_API_KEY: 'byok' };
-    expect(resolveAuthentication({ env: { AUTOHAND_AI_API_KEY: 'scoped' } }, env)).toMatchObject({ provider: 'autohandai', apiKey: 'scoped', source: 'AUTOHAND_AI_API_KEY' });
+    const env = { AUTOHAND_API_KEY: 'canonical', AUTOHAND_AI_API_KEY: 'alias' };
+    expect(resolveAuthentication({ env: { AUTOHAND_API_KEY: 'scoped' } }, env)).toMatchObject({ provider: 'autohandai', apiKey: 'scoped', source: 'AUTOHAND_API_KEY' });
     expect(resolveAuthentication({}, env).apiKey).toBe('canonical');
-    expect(resolveAuthentication({}, { AUTOHAND_API_KEY: 'alias' }).apiKey).toBe('alias');
-    expect(env.AUTOHAND_AI_API_KEY).toBe('canonical');
+    expect(resolveAuthentication({}, { AUTOHAND_AI_API_KEY: 'alias' }).apiKey).toBe('alias');
+    expect(env.AUTOHAND_API_KEY).toBe('canonical');
   });
 
   it('selects native Anthropic for BYOK and refuses to invent hosted Claude routes', () => {
-    const auth = resolveAuthentication({}, { ANTHROPIC_API_KEY: 'byok' });
+    const auth = resolveAuthentication({}, { AUTOHAND_API_KEY: 'account', ANTHROPIC_API_KEY: 'byok' });
     expect(auth.provider).toBe('anthropic');
     expect(resolveModel('sonnet', auth).model).toBe('claude-sonnet-5');
     expect(resolveModel('claude-haiku-4-5', auth).model).toBe('claude-haiku-4-5');
@@ -26,7 +26,7 @@ describe('Claude compatibility foundation', () => {
   });
 
   it('supports explicit local and other provider model identifiers', () => {
-    const auth = resolveAuthentication({ provider: 'ollama' }, {});
+    const auth = resolveAuthentication({ provider: 'ollama' }, { AUTOHAND_API_KEY: 'account' });
     expect(resolveModel('ollama:qwen3-coder', auth)).toMatchObject({ provider: 'ollama', model: 'qwen3-coder' });
     expect(resolveModel('fantail', resolveAuthentication({}, { AUTOHAND_API_KEY: 'cloud' }))).toMatchObject({ provider: 'autohandai', model: 'fantail' });
   });

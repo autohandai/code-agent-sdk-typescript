@@ -3,6 +3,24 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ClaudeCompatibilityError } from '../errors/claude-compat.js';
 import type { Options } from '../compat/claude/types.js';
 
+const accountApiKeySchema = z.string().trim().min(1);
+
+export function validateAutohandCredential(key: string, env: Record<string, string | undefined>): void {
+  if (key.trim() === env.ANTHROPIC_API_KEY?.trim()) {
+    throw new ClaudeCompatibilityError('ANTHROPIC_API_KEY is a provider credential, not an Autohand account key. Get a free Autohand API key at https://console.autohand.ai/api-keys and set AUTOHAND_API_KEY.', 'AUTOHAND_CLAUDE_AUTH_REQUIRED');
+  }
+}
+
+export function requireAutohandAccountKey(env: Record<string, string | undefined>): string {
+  const primary = env.AUTOHAND_API_KEY?.trim() ?? '';
+  const parsed = accountApiKeySchema.safeParse(primary.length > 0 ? primary : env.AUTOHAND_AI_API_KEY);
+  if (!parsed.success) {
+    throw new ClaudeCompatibilityError('Get a free Autohand API key at https://console.autohand.ai/api-keys and set AUTOHAND_API_KEY.', 'AUTOHAND_CLAUDE_AUTH_REQUIRED');
+  }
+  validateAutohandCredential(parsed.data, env);
+  return parsed.data;
+}
+
 export async function validateToolArguments<Schema extends z.ZodRawShape>(shape: Schema, value: unknown): Promise<z.output<z.ZodObject<Schema>>> {
   return z.object(shape).parseAsync(value);
 }

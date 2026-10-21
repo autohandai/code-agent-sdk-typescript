@@ -7,6 +7,9 @@ Autohand Code Agent SDK - CLI wrapper implementation for TypeScript.
 The `/claude` compatibility entry point is under development and has not been
 published. Read [COMPAT.md](COMPAT.md) for the implemented surface, official
 example results and runtime blockers before evaluating this branch.
+The [unreleased migration notes](docs/claude-compat.md) describe the required
+Autohand account key and separate BYOK credentials. CLI authentication policy
+has not changed.
 
 ## Overview
 
