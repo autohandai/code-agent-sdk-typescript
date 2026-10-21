@@ -7,6 +7,12 @@
 // JSON-RPC 2.0 Base Types
 // ============================================================================
 
+/** An unmodified CLI notification, including future methods and payload shapes. */
+export interface WireNotification {
+  readonly method: string;
+  readonly params: unknown;
+}
+
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
   method: string;
@@ -84,6 +90,7 @@ export type JsonRpcParams = Record<string, unknown> | unknown[];
  */
 export type BuiltInProviderName =
   | 'autohandai'
+  | 'anthropic'
   | 'openrouter'
   | 'ollama'
   | 'llamacpp'
@@ -101,7 +108,8 @@ export type BuiltInProviderName =
   | 'bedrock';
 
 export type CustomProviderId = `custom:${string}`;
-export type ProviderName = BuiltInProviderName | CustomProviderId;
+export type ExtensionProviderId = `extension:${string}`;
+export type ProviderName = BuiltInProviderName | CustomProviderId | ExtensionProviderId;
 
 /**
  * AUTOHAND_ prefixed environment variables supported by CLI-3.
@@ -181,13 +189,17 @@ export class ProviderConfigError extends Error {
  * 
  * @throws {ProviderConfigError} If configuration is invalid for the specified provider
  */
-export function validateProviderConfig(provider: ProviderName, config: SDKConfig): void {
+export function validateProviderConfig(
+  provider: ProviderName, config: SDKConfig,
+  options: { allowInheritedConfig?: boolean } = {},
+): void {
+  const inherited = options.allowInheritedConfig === true;
   switch (provider) {
     case 'openai':
-      validateOpenAIConfig(config);
+      validateOpenAIConfig(config, inherited);
       break;
     case 'azure':
-      validateAzureConfig(config);
+      validateAzureConfig(config, inherited);
       break;
     case 'zai':
     case 'sakana':
@@ -198,13 +210,13 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
     case 'deepseek':
     case 'vertexai':
     case 'nvidia':
-      validateCloudProviderConfig(provider, config);
+      validateCloudProviderConfig(provider, config, inherited);
       break;
     case 'bedrock':
       break;
     case 'autohandai':
       if (config.autohandAIPlan !== 'local') {
-        validateCloudProviderConfig(provider, config);
+        validateCloudProviderConfig(provider, config, inherited);
       }
       break;
     case 'ollama':
@@ -219,7 +231,7 @@ export function validateProviderConfig(provider: ProviderName, config: SDKConfig
   }
 }
 
-function validateOpenAIConfig(config: SDKConfig): void {
+function validateOpenAIConfig(config: SDKConfig, inherited: boolean): void {
   if (config.openaiAuthMode && !['api-key', 'chatgpt'].includes(config.openaiAuthMode)) {
     throw new ProviderConfigError(
       `Invalid openaiAuthMode: ${config.openaiAuthMode}. Must be 'api-key' or 'chatgpt'`
@@ -233,21 +245,21 @@ function validateOpenAIConfig(config: SDKConfig): void {
   }
 
   if (config.openaiAuthMode === 'chatgpt') {
-    if (config.chatgptAccessToken === undefined || config.chatgptAccessToken === '') {
+    if ((!inherited && config.chatgptAccessToken === undefined) || config.chatgptAccessToken === '') {
       throw new ProviderConfigError('chatgptAccessToken is required when openaiAuthMode is chatgpt');
     }
-    if (config.chatgptAccountId === undefined || config.chatgptAccountId === '') {
+    if ((!inherited && config.chatgptAccountId === undefined) || config.chatgptAccountId === '') {
       throw new ProviderConfigError('chatgptAccountId is required when openaiAuthMode is chatgpt');
     }
   } else {
     // api-key mode (default) requires an apiKey
-    if (config.apiKey === undefined || config.apiKey === '') {
+    if ((!inherited && config.apiKey === undefined) || config.apiKey === '') {
       throw new ProviderConfigError("apiKey is required for provider 'openai'");
     }
   }
 }
 
-function validateAzureConfig(config: SDKConfig): void {
+function validateAzureConfig(config: SDKConfig, inherited: boolean): void {
   if (config.azureAuthMethod !== undefined && !['api-key', 'entra-id', 'managed-identity'].includes(config.azureAuthMethod)) {
     throw new ProviderConfigError(
       `Invalid azureAuthMethod: ${config.azureAuthMethod}. Must be 'api-key', 'entra-id', or 'managed-identity'`
@@ -257,24 +269,24 @@ function validateAzureConfig(config: SDKConfig): void {
   const authMethod = config.azureAuthMethod ?? 'api-key';
 
   if (authMethod === 'entra-id') {
-    if (config.azureTenantId === undefined || config.azureTenantId === '') {
+    if ((!inherited && config.azureTenantId === undefined) || config.azureTenantId === '') {
       throw new ProviderConfigError('azureTenantId is required when azureAuthMethod is entra-id');
     }
-    if (config.azureClientId === undefined || config.azureClientId === '') {
+    if ((!inherited && config.azureClientId === undefined) || config.azureClientId === '') {
       throw new ProviderConfigError('azureClientId is required when azureAuthMethod is entra-id');
     }
-    if (config.azureClientSecret === undefined || config.azureClientSecret === '') {
+    if ((!inherited && config.azureClientSecret === undefined) || config.azureClientSecret === '') {
       throw new ProviderConfigError('azureClientSecret is required when azureAuthMethod is entra-id');
     }
   }
 
-  if (authMethod === 'api-key' && (config.apiKey === undefined || config.apiKey === '')) {
+  if (authMethod === 'api-key' && ((!inherited && config.apiKey === undefined) || config.apiKey === '')) {
     throw new ProviderConfigError('apiKey is required when azureAuthMethod is api-key');
   }
 }
 
-function validateCloudProviderConfig(provider: ProviderName, config: SDKConfig): void {
-  if (config.apiKey === undefined || config.apiKey === '') {
+function validateCloudProviderConfig(provider: ProviderName, config: SDKConfig, inherited: boolean): void {
+  if ((!inherited && config.apiKey === undefined) || config.apiKey === '') {
     throw new ProviderConfigError(`apiKey is required for provider '${provider}'`);
   }
 }
@@ -665,9 +677,11 @@ export interface SessionMetadata {
  * Session settings for SDK
  */
 export interface SessionSettings {
-  /** Persist session to disk */
+  /** Legacy compatibility field. The CLI persists by default; use ephemeral to opt out. */
   persistSession?: boolean;
-  /** Alias for persistSession */
+  /** Keep this run out of session history and synchronization. */
+  ephemeral?: boolean;
+  /** Legacy alias for persistSession; use ephemeral to disable persistence. */
   persist?: boolean;
   /** Session ID to resume */
   sessionId?: string;
@@ -1134,6 +1148,8 @@ This file helps AI assistants understand your project structure, conventions, an
 }
 
 export interface SDKConfig {
+  /** Private process-only provider, feature and session overrides. Requires a compatible CLI. */
+  runSettings?: Record<string, unknown>;
   // ============================================================================
   // Basic Configuration
   // ============================================================================
@@ -1285,8 +1301,10 @@ export interface SDKConfig {
   session?: SessionSettings;
   /** Concurrent-session awareness settings applied before CLI startup. */
   sessions?: SessionsSettings;
-  /** Persist session to disk (legacy, use session.persistSession) */
+  /** Legacy compatibility field; use ephemeral to disable persistence. */
   persistSession?: boolean;
+  /** Keep this run out of session history and synchronization. */
+  ephemeral?: boolean;
   /** Session ID to resume (legacy, use session.sessionId) */
   sessionId?: string;
   /** Resume from last session (legacy, use session.resume) */
@@ -1423,15 +1441,48 @@ export interface SDKConfig {
 }
 
 export interface FeatureFlagSettings {
+  /** Full-screen interactive terminal (default: true); opt out with false and restart. */
+  fullScreenMode?: boolean;
+  multi_agent_v2?: {
+    /** Total session threads including the main agent. Integer 1–64; default 9. */
+    max_concurrent_threads_per_session?: number;
+  };
+  /** Gate Autohand-hosted inference provider, models, setup, RPC, and ACP surfaces. */
+  autohand_inference?: boolean;
+  /** Remote feature flag environment (default: production) */
   environment?: string;
+  /** Local opt-outs for remote feature flags. Users can only force remote-enabled flags off. */
   remoteOverrides?: Record<string, 'off'>;
+  /** Enable the CLI token activity dashboard for /usage daily/weekly/monthly. */
+  cliUsageV2?: boolean;
+  /** Enable the v2 usage dashboard command and /status usage panel. */
   usageV2?: boolean;
+  /** Enable AWS Bedrock provider support. */
   awsBedrockProvider?: boolean;
+  /** Enable the experimental persistent /goal surface across CLI, tools, RPC, and ACP. */
   slashGoal?: boolean;
+  /** Expose `run_tool_script`: one sandboxed script that calls tools and returns only its result (default: false). */
+  codeMode?: boolean;
+  /** Show real-time token usage (tokens up/down + context window occupancy) in the status line. */
   tokenUsageStatus?: boolean;
+  /** Enable experimental provider-native prompt cache affinity. */
+  promptCaching?: boolean;
+  /** Resolve and run explicitly requested specialist rosters before the lead turn. */
+  automaticSpecialists?: boolean;
+  /** Enable the experimental /fork session branching surface. */
   experimentalFork?: boolean;
+  /** Enable the experimental /clone session duplication surface. */
   experimentalClone?: boolean;
+  /** Enable the experimental /handoff session surface. */
   experimentalHandoff?: boolean;
+  /** Enable negotiated browser automation protocol v2 tools. */
+  experimentalBrowserToolsV2?: boolean;
+  /** Record model-visible file coverage in the active session. */
+  readStateLedger?: boolean;
+  /** Deduplicate repeated unchanged file windows; implies readStateLedger. */
+  readStateDedup?: boolean;
+  /** Require a complete unchanged read before direct file mutations; implies earlier read-state flags. */
+  readBeforeWrite?: boolean;
 }
 
 export interface CLIConfig {
@@ -1889,6 +1940,60 @@ export interface PromptParams {
    * - "auto" to automatically detect from workspace
    */
   agentsMd?: string | { path?: string; content?: string; auto?: boolean };
+  /**
+   * Stop the current result at a completed tool-step boundary.
+   *
+   * Conditions receive the ordered completed steps and may be asynchronous.
+   * When an array is provided, the run stops when any condition returns true.
+   */
+  stopWhen?: StopCondition | readonly StopCondition[];
+}
+
+/** A tool call produced during one completed agent step. */
+export interface AgentStepToolCall {
+  id?: string;
+  tool: string;
+  args: Record<string, unknown>;
+}
+
+/** A tool result persisted during one completed agent step. */
+export interface AgentStepToolResult {
+  tool: string;
+  success: boolean;
+  output?: string;
+  error?: string;
+}
+
+/** Serializable record of a completed tool step. */
+export interface AgentStep {
+  stepNumber: number;
+  thought?: string;
+  toolCalls: AgentStepToolCall[];
+  toolResults: AgentStepToolResult[];
+}
+
+/** Input supplied to a stop condition after each completed tool step. */
+export interface StopConditionContext {
+  steps: readonly AgentStep[];
+}
+
+/** AI SDK-style predicate controlling whether another model step may start. */
+export type StopCondition = (
+  context: StopConditionContext
+) => boolean | Promise<boolean>;
+
+/** Wire-only prompt settings understood by CLI-3 RPC mode. */
+export interface RpcPromptParams extends Omit<PromptParams, 'stopWhen'> {
+  stopWhen?: { mode: 'host' };
+}
+
+export interface StepDecisionParams {
+  stepId: string;
+  stop: boolean;
+}
+
+export interface StepDecisionResult {
+  success: boolean;
 }
 
 export interface ImageAttachment {
@@ -1903,6 +2008,19 @@ export type GetStateParams = Record<string, never>;
 
 export interface GetMessagesParams {
   limit?: number;
+}
+
+/** Negotiate the browser extension tool protocol with the CLI. */
+export interface BrowserCapabilitiesSetParams {
+  protocolVersion: number;
+  extensionVersion: string;
+  tools: string[];
+}
+
+export interface BrowserCapabilitiesSetResult {
+  enabled: boolean;
+  protocolVersion: 1 | 2;
+  tools: string[];
 }
 
 export interface BrowserHandoffCreateParams {
@@ -2395,6 +2513,7 @@ export type SDKEvent =
   | ToolStartEvent
   | ToolUpdateEvent
   | ToolEndEvent
+  | StepEndEvent
   | FileModifiedEvent
   | PermissionRequestEvent
   | AutomodeIterationEvent
@@ -2405,6 +2524,7 @@ export type SDKEvent =
   | HookPrePromptEvent
   | HookPostResponseEvent
   | HookSessionErrorEvent
+  | HookRateLimitEvent
   | HookStopEvent
   | HookSessionStartEvent
   | HookSessionEndEvent
@@ -2534,6 +2654,24 @@ export interface HookSessionErrorEvent {
   error: string;
   code?: string;
   context?: Record<string, unknown>;
+  timestamp: string;
+}
+
+/**
+ * Emitted when a provider rate limit ends the turn.
+ *
+ * The CLI does not session-retry rate limits — a quota cannot clear inside the
+ * turn — so this fires once, immediately, alongside `hook_session_error`.
+ * `retryAfterMs` is present only when the provider advertised a Retry-After.
+ */
+export interface HookRateLimitEvent {
+  type: 'hook_rate_limit';
+  error: string;
+  code?: string;
+  retryAfterMs?: number;
+  httpStatus?: number;
+  model?: string;
+  provider?: string;
   timestamp: string;
 }
 
@@ -2692,7 +2830,7 @@ export interface AgentStartEvent {
 export interface AgentEndEvent {
   type: 'agent_end';
   sessionId: string;
-  reason: 'completed' | 'aborted' | 'error';
+  reason: 'completed' | 'aborted' | 'stopped' | 'error';
   timestamp: string;
 }
 
@@ -2710,6 +2848,7 @@ export interface TurnEndEvent {
   tokensUsageStatus?: 'actual' | 'unavailable';
   durationMs?: number;
   contextPercent?: number;
+  reason?: 'completed' | 'aborted' | 'stop_condition';
 }
 
 export interface MessageStartEvent {
@@ -2757,6 +2896,14 @@ export interface ToolEndEvent {
   success: boolean;
   output?: string;
   error?: string;
+  timestamp: string;
+}
+
+/** A completed tool step awaiting an optional host stop decision. */
+export interface StepEndEvent {
+  type: 'step_end';
+  stepId: string;
+  step: AgentStep;
   timestamp: string;
 }
 
@@ -2869,6 +3016,7 @@ export type HookEvent =
   | 'permission-request'
   | 'notification'
   | 'session-error'
+  | 'rate-limit'
   // Auto-mode events
   | 'automode:start'
   | 'automode:iteration'
@@ -2933,6 +3081,7 @@ export const HOOK_EVENTS = [
   'permission-request',
   'notification',
   'session-error',
+  'rate-limit',
   'automode:start',
   'automode:iteration',
   'automode:checkpoint',
@@ -3243,6 +3392,11 @@ export interface AgentInfo {
   name: string;
   description: string;
   tools?: string[];
+  model?: string;
+  source?: string;
+  extensionId?: string;
+  extensionVersion?: string;
+  extensionScope?: 'user' | 'project';
 }
 
 export interface ContextUsage {

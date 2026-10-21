@@ -316,7 +316,7 @@ describe('CLI feature parity', () => {
     ]);
   });
 
-  it('applies feature flags before exposing goal operations', async () => {
+  it('keeps feature flags in the startup envelope without replacing merged CLI settings', async () => {
     const calls: string[] = [];
     const sdk = new AutohandSDK({ features: { slashGoal: true } });
     (sdk as unknown as {
@@ -340,14 +340,11 @@ describe('CLI feature parity', () => {
 
     await sdk.start();
 
-    expect(calls).toEqual([
-      'start',
-      'flags:{"features":{"slashGoal":true}}',
-    ]);
+    expect(calls).toEqual(['start']);
   });
 
   it('rolls back failed startup initialization and allows retry', async () => {
-    const sdk = new AutohandSDK({ features: { slashGoal: true } });
+    const sdk = new AutohandSDK({ planMode: true });
     let connected = false;
     let attempts = 0;
     let stops = 0;
@@ -356,7 +353,7 @@ describe('CLI feature parity', () => {
         start(): Promise<void>;
         stop(): Promise<void>;
         isConnected(): boolean;
-        applyFlagSettings(settings: Record<string, unknown>): Promise<unknown>;
+        setPlanMode(enabled: boolean): Promise<unknown>;
       };
     }).client = {
       start: async () => {
@@ -367,7 +364,7 @@ describe('CLI feature parity', () => {
         connected = false;
       },
       isConnected: () => connected,
-      applyFlagSettings: async () => {
+      setPlanMode: async () => {
         attempts += 1;
         if (attempts === 1) throw new Error('feature initialization failed');
         return { success: true };

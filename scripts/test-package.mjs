@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadTarget } from './cli-packages.mjs';
-import { npmCommand } from './npm-command.mjs';
 
 const exec = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,8 +57,10 @@ const server = createServer((request, response) => {
 });
 
 async function pack(cwd) {
-  const { stdout } = await exec(...npmCommand(['pack', '--json', '--workspaces=false', '--pack-destination', directory]), { cwd });
-  return join(directory, JSON.parse(stdout)[0].filename);
+  const manifest = JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8'));
+  const artifact = join(directory, manifest.name.replaceAll('/', '-').replace('@', '') + '.tgz');
+  await exec('bun', ['pm', 'pack', '--ignore-scripts', '--filename', artifact], { cwd });
+  return artifact;
 }
 
 try {
@@ -70,8 +71,7 @@ try {
   const project = join(directory, 'consumer');
   await mkdir(project);
   await writeFile(join(project, 'package.json'), '{"private":true,"type":"module"}');
-  await exec(...npmCommand(['install', sdkArtifact, '--ignore-scripts', '--no-audit', '--no-fund', '--registry', base,
-    '--cache', join(directory, 'cache')]), { cwd: project, timeout: 120_000 });
+  await exec('bun', ['add', sdkArtifact, '--ignore-scripts', '--registry', base, '--no-progress'], { cwd: project, timeout: 120_000, env: { ...process.env, BUN_INSTALL_CACHE_DIR: join(directory, 'cache') } });
   const scope = join(project, 'node_modules', '@autohandai');
   const platforms = (await readdir(scope)).filter(name => name.startsWith('agent-sdk-'));
   assert.deepEqual(platforms, [`agent-sdk-${target}`]);

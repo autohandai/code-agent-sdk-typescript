@@ -8,6 +8,7 @@ import type {
   AutomodeStartResult,
   AutomodeState,
   AutomodeStatusResult,
+  BrowserCapabilitiesSetResult,
   BrowserHandoffAttachResult,
   BrowserHandoffCreateResult,
   ResetResult,
@@ -176,6 +177,17 @@ function objectSchema<T extends object>(shape: ObjectShape<T>): RuntimeSchema<T>
   };
 }
 
+const browserCapabilitiesResultSchema = objectSchema<BrowserCapabilitiesSetResult>({
+  enabled: required(booleanSchema),
+  protocolVersion: required({
+    expected: '1 | 2',
+    validate(value, path) {
+      return value === 1 || value === 2 ? success(value) : failure(path, this.expected, value);
+    },
+  }),
+  tools: required(arraySchema(stringSchema)),
+});
+
 const resetResultSchema = objectSchema<ResetResult>({
   sessionId: required(stringSchema),
 });
@@ -259,6 +271,7 @@ const automodeGetLogResultSchema = objectSchema<AutomodeGetLogResult>({
 });
 
 interface SessionControlRpcResultMap {
+  'autohand.browserCapabilities.set': BrowserCapabilitiesSetResult;
   'autohand.reset': ResetResult;
   'autohand.browserHandoff.create': BrowserHandoffCreateResult;
   'autohand.browserHandoff.attach': BrowserHandoffAttachResult;
@@ -276,6 +289,7 @@ export type SessionControlRpcMethod = keyof SessionControlRpcResultMap;
 const sessionControlRpcResultSchemas: {
   readonly [Method in SessionControlRpcMethod]: RuntimeSchema<SessionControlRpcResultMap[Method]>;
 } = {
+  'autohand.browserCapabilities.set': browserCapabilitiesResultSchema,
   'autohand.reset': resetResultSchema,
   'autohand.browserHandoff.create': browserHandoffCreateResultSchema,
   'autohand.browserHandoff.attach': browserHandoffAttachResultSchema,

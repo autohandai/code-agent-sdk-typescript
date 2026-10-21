@@ -11,7 +11,8 @@
     "examples/27-autoresearch-ledger.ts",
     "examples/28-session-awareness.ts",
     "examples/29-weka-decisions.ts",
-    "examples/session-awareness/**/*.ts"
+    "examples/session-awareness/**/*.ts",
+    "examples/29-stop-when.ts"
   ],
   "exclude": [
     "node_modules",

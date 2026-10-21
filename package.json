@@ -27,6 +27,7 @@
     "!dist/__tests__",
     "README.md",
     "CHANGELOG.md",
+    "docs/agent-discovery.md",
     "docs/autoresearch.md",
     "docs/agent-cli-comparison.md",
     "docs/session-awareness.md",
@@ -38,7 +39,12 @@
     "examples/29-weka-decisions.ts",
     "examples/session-awareness",
     "tsconfig.examples.json",
-    "LICENSE"
+    "LICENSE",
+    "docs/step-control.md",
+    "examples/29-stop-when.ts",
+    "docs/cli-compatibility.md",
+    "contract/current-cli.json",
+    "scripts/check_cli_contract.py"
   ],
   "publishConfig": {
     "access": "public"
@@ -61,6 +67,7 @@
     "cli:publish": "node scripts/cli-packages.mjs publish",
     "pack:check": "node scripts/check-package.mjs",
     "test:package": "bun run build && node scripts/test-package.mjs",
+    "test:package:paired": "bun run build && bun scripts/verify-package.mjs",
     "test:packaging": "bun test tests/cli-packages.test.mjs"
   },
   "keywords": [

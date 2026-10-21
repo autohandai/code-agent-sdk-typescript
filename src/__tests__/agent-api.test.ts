@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { Agent, StructuredOutputError, parseJsonText } from '../sdk/agent.js';
+import {
+  Agent,
+  StructuredOutputError,
+  isStepCount,
+  parseJsonText,
+} from '../sdk/agent.js';
 import type { SDKEvent } from '../types/index.js';
 import { AutohandSDK } from '../sdk/index.js';
 
@@ -83,6 +88,54 @@ describe('Agent high-level API', () => {
     expect(result.status).toBe('completed');
     expect(result.text).toBe('Hello, SDK');
     expect(result.events).toHaveLength(3);
+  });
+
+  it('reports a run stopped by a completed step condition', async () => {
+    const prompts: unknown[] = [];
+    const step = {
+      stepNumber: 1,
+      thought: 'Inspect the entrypoint.',
+      toolCalls: [{
+        id: 'tool-1',
+        tool: 'read_file',
+        args: { path: 'src/index.ts' },
+      }],
+      toolResults: [{
+        tool: 'read_file',
+        success: true,
+        output: 'source',
+      }],
+    };
+    const sdk = {
+      streamPrompt: async function* streamPrompt(params: unknown): AsyncGenerator<SDKEvent> {
+        prompts.push(params);
+        yield {
+          type: 'step_end',
+          stepId: 'step-1',
+          step,
+          timestamp: '2026-07-29T00:00:00.000Z',
+        };
+        yield {
+          type: 'agent_end',
+          sessionId: 'session-1',
+          reason: 'stopped',
+          timestamp: '2026-07-29T00:00:01.000Z',
+        };
+      },
+      interrupt: async () => undefined,
+      close: async () => undefined,
+    } as unknown as AutohandSDK;
+
+    const result = await Agent.fromSDK(sdk).run('Inspect one step', {
+      stopWhen: isStepCount(1),
+    });
+
+    expect(result.status).toBe('stopped');
+    expect(result.steps).toEqual([step]);
+    expect(prompts).toHaveLength(1);
+    const prompt = prompts[0] as Record<string, unknown>;
+    expect(prompt.message).toBe('Inspect one step');
+    expect(typeof prompt.stopWhen).toBe('function');
   });
 
   it('allows streaming first and waiting for the same run result later', async () => {

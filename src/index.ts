@@ -28,7 +28,14 @@
 /**
  * High-level Agent and Run API
  */
-export { Agent, Run, StructuredOutputError, parseJsonText } from './sdk/agent.js';
+export {
+  Agent,
+  Run,
+  StructuredOutputError,
+  hasToolCall,
+  isStepCount,
+  parseJsonText,
+} from './sdk/agent.js';
 export type {
   AgentInput,
   AgentOptions,

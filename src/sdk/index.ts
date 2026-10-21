@@ -29,12 +29,15 @@
 import { RPCClient } from '../rpc/client.js';
 import type {
   ActiveAgentRecord,
+  WireNotification,
   SDKConfig,
   PromptParams,
   GetStateParams,
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  BrowserCapabilitiesSetParams,
+  BrowserCapabilitiesSetResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
@@ -126,6 +129,9 @@ import type {
   McpListToolsParams,
   McpListToolsResult,
   McpGetServerConfigsResult,
+  AgentStep,
+  RpcPromptParams,
+  StopCondition,
 } from '../types/index.js';
 import { Tool, loadAgentsMd, createDefaultAgentsMd } from '../types/index.js';
 
@@ -206,7 +212,49 @@ function addAgentsMdToPrompt(
   if (params.thinkingLevel !== undefined) {
     prompt.thinkingLevel = params.thinkingLevel;
   }
+  if (params.stopWhen !== undefined) {
+    prompt.stopWhen = params.stopWhen;
+  }
   return prompt;
+}
+
+function normalizeStopConditions(
+  stopWhen: PromptParams['stopWhen']
+): StopCondition[] {
+  if (stopWhen === undefined) return [];
+  return typeof stopWhen === 'function' ? [stopWhen] : [...stopWhen];
+}
+
+type StepDecision = {
+  type: 'step_decision';
+  stepId: string;
+} & ({ stop: boolean; failure?: never } | { stop: true; failure: { error: unknown } });
+
+async function evaluateStopConditions(
+  conditions: readonly StopCondition[],
+  steps: readonly AgentStep[],
+  stepId: string
+): Promise<StepDecision> {
+  try {
+    const decisions = await Promise.all(conditions.map((condition) => condition({ steps })));
+    return { type: 'step_decision', stepId, stop: decisions.some(Boolean) };
+  } catch (error) {
+    return { type: 'step_decision', stepId, stop: true, failure: { error } };
+  }
+}
+
+function toRpcPromptParams(
+  params: PromptParams,
+  hasStopConditions: boolean
+): RpcPromptParams {
+  const wireParams: RpcPromptParams = { message: params.message };
+  if (params.context !== undefined) wireParams.context = params.context;
+  if (params.images !== undefined) wireParams.images = params.images;
+  if (params.thinkingLevel !== undefined) {
+    wireParams.thinkingLevel = params.thinkingLevel;
+  }
+  if (hasStopConditions) wireParams.stopWhen = { mode: 'host' };
+  return wireParams;
 }
 
 function allowDecision(scope: PermissionDecisionScope) {
@@ -253,8 +301,30 @@ export class AutohandSDK {
   private startPromise: Promise<void> | null = null;
   private stopPromise: Promise<void> | null = null;
   private promptTail: Promise<void> = Promise.resolve();
+  private activePromptCancellation: AbortController | undefined;
   private _tools: Tool[] = [];
   private _skills: SkillReference[] = [];
+  private notificationObservers = new Map<(notification: WireNotification) => void, { unsubscribe: () => void }>();
+
+  /** Observe complete CLI packets. Unsubscribe when finished; observers survive client rebuilds. */
+  onNotification(callback: (notification: WireNotification) => void): () => void {
+    this.notificationObservers.get(callback)?.unsubscribe();
+    const registration = { unsubscribe: this.client.onNotification(callback) };
+    this.notificationObservers.set(callback, registration);
+    return () => {
+      if (this.notificationObservers.get(callback) === registration) {
+        registration.unsubscribe();
+        this.notificationObservers.delete(callback);
+      }
+    };
+  }
+
+  private rebindNotificationObservers(): void {
+    for (const [callback, registration] of this.notificationObservers) {
+      registration.unsubscribe();
+      registration.unsubscribe = this.client.onNotification(callback);
+    }
+  }
 
   /**
    * Create a new AutohandSDK instance
@@ -297,6 +367,7 @@ export class AutohandSDK {
       ? { ...this.config, skillRefs: this._skills }
       : this.config;
     this.client = new RPCClient(clientConfig);
+    this.rebindNotificationObservers();
   }
 
   private ensureNotStarted(operation: string): void {
@@ -463,14 +534,11 @@ export class AutohandSDK {
     if (this._skills.length > 0) {
       this.config.skillRefs = this._skills;
       this.client = new RPCClient(this.config);
+      this.rebindNotificationObservers();
     }
 
     try {
       await this.client.start();
-
-      if (this.config.features !== undefined) {
-        await this.client.applyFlagSettings({ features: this.config.features });
-      }
 
       const startupPermissionMode = this.config.permissionMode;
       if (requiresStartupPermissionModeRpc(startupPermissionMode)) {
@@ -519,6 +587,7 @@ export class AutohandSDK {
   }
 
   private async stopSession(): Promise<void> {
+    this.activePromptCancellation?.abort();
     if (this.startPromise !== null) {
       await this.startPromise.catch(() => undefined);
     }
@@ -625,8 +694,13 @@ export class AutohandSDK {
         processedParams = addAgentsMdToPrompt(params, agentsMdData);
       }
     }
+    const stopConditions = normalizeStopConditions(processedParams.stopWhen);
+    const rpcParams = toRpcPromptParams(processedParams, stopConditions.length > 0);
+    const completedSteps: AgentStep[] = [];
 
     const releasePrompt = await this.acquirePrompt();
+    const promptCancellation = new AbortController();
+    this.activePromptCancellation = promptCancellation;
     const eventCancellation = new AbortController();
     // Register before sending the prompt and ignore historical backlog. This
     // prevents a delayed terminal event from an earlier turn from completing
@@ -636,8 +710,10 @@ export class AutohandSDK {
     let nextEvent = events.next();
     let promptSettled = false;
     let promptError: unknown;
+    let stopConditionFailure: { error: unknown } | undefined;
+    let pendingDecision: Promise<StepDecision> | undefined;
     let terminalEventSeen = false;
-    const promptCompletion = this.client.prompt(processedParams)
+    const promptCompletion = this.client.prompt(rpcParams)
       .then(() => {
         promptSettled = true;
       })
@@ -653,12 +729,11 @@ export class AutohandSDK {
           throw promptError;
         }
 
-        const result = promptSettled
-          ? { type: 'event' as const, value: await nextEvent }
-          : await Promise.race([
-            nextEvent.then((value) => ({ type: 'event' as const, value })),
-            promptCompletion.then(() => ({ type: 'prompt' as const })),
-          ]);
+        const result = await Promise.race([
+          nextEvent.then((value) => ({ type: 'event' as const, value })),
+          ...(promptSettled ? [] : [promptCompletion.then(() => ({ type: 'prompt' as const }))]),
+          ...(pendingDecision === undefined ? [] : [pendingDecision]),
+        ]);
 
         if (result.type === 'prompt') {
           if (promptError !== undefined) {
@@ -667,11 +742,35 @@ export class AutohandSDK {
           continue;
         }
 
+        if (result.type === 'step_decision') {
+          pendingDecision = undefined;
+          if (promptCancellation.signal.aborted) continue;
+          const decision = await this.client.stepDecision({ stepId: result.stepId, stop: result.stop });
+          if (promptCancellation.signal.aborted) continue;
+          if (!decision.success) {
+            throw new Error(`CLI rejected step decision for ${result.stepId}.`);
+          }
+          stopConditionFailure = result.failure;
+          continue;
+        }
+
         if (result.value.done === true) {
           break;
         }
 
         const event = result.value.value;
+        if (
+          event.type === 'unknown_notification'
+          && event.method === 'autohand.stepEnd'
+        ) {
+          throw new Error('CLI emitted a malformed autohand.stepEnd notification.');
+        }
+        if (event.type === 'step_end') {
+          completedSteps.push(event.step);
+          if (!promptCancellation.signal.aborted) {
+            pendingDecision = evaluateStopConditions(stopConditions, [...completedSteps], event.stepId);
+          }
+        }
         if (event.type === 'agent_end') {
           terminalEventSeen = true;
         }
@@ -684,6 +783,10 @@ export class AutohandSDK {
         nextEvent = events.next();
       }
     } finally {
+      promptCancellation.abort();
+      if (this.activePromptCancellation === promptCancellation) {
+        this.activePromptCancellation = undefined;
+      }
       const abandoned = !terminalEventSeen && promptError === undefined;
       if (abandoned) {
         await this.settleAbandonedPrompt(events);
@@ -695,6 +798,9 @@ export class AutohandSDK {
     }
     if (promptError !== undefined) {
       throw promptError;
+    }
+    if (stopConditionFailure !== undefined) {
+      throw stopConditionFailure.error;
     }
   }
 
@@ -802,6 +908,7 @@ export class AutohandSDK {
    */
   async interrupt(): Promise<void> {
     await this.ensureStarted();
+    this.activePromptCancellation?.abort();
     await this.client.abort();
   }
 
@@ -1149,8 +1256,8 @@ export class AutohandSDK {
    * ```
    */
   async supportedAgents(): Promise<AgentInfo[]> {
-    // TODO: Implement RPC method to get supported agents
-    return [];
+    await this.ensureStarted();
+    return (await this.client.getSupportedAgents()).agents;
   }
 
   /**
@@ -1459,6 +1566,12 @@ export class AutohandSDK {
   /**
    * Create a browser handoff URL for the active session.
    */
+  /** Negotiate browser tools before issuing browser tasks. */
+  async setBrowserCapabilities(params: BrowserCapabilitiesSetParams): Promise<BrowserCapabilitiesSetResult> {
+    await this.ensureStarted();
+    return this.client.setBrowserCapabilities(params);
+  }
+
   async createBrowserHandoff(
     params: BrowserHandoffCreateParams = {}
   ): Promise<BrowserHandoffCreateResult> {

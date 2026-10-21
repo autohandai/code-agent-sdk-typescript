@@ -1,3 +1,6 @@
+import { validateCliArguments } from '../validation/cli-compatibility.js';
+import { buildRuntimeSettings, needsRuntimeSettings } from '../validation/runtime-settings.js';
+import type { FeatureFlagSettings, WireNotification } from '../types/index.js';
 /**
  * Transport layer for CLI subprocess communication
  * 
@@ -47,6 +50,8 @@ interface PendingRequest {
  * Configuration options for the Transport layer
  */
 export interface TransportOptions {
+  features?: FeatureFlagSettings | undefined;
+  runSettings?: Record<string, unknown> | undefined;
   /** Working directory for the CLI subprocess */
   cwd?: string;
   /** Path to CLI binary (auto-detected if not provided) */
@@ -113,8 +118,9 @@ export interface TransportOptions {
   sessionAwareness?: SessionAwarenessTier;
 
   // Session options
-  /** Persist session to disk */
+  /** Legacy compatibility field; use ephemeral to disable persistence. */
   persistSession?: boolean;
+  ephemeral?: boolean;
   /** Session ID to resume */
   sessionId?: string;
   /** Resume from last session */
@@ -179,6 +185,7 @@ export interface TransportOptions {
 
 export function buildCliArgs(options: TransportOptions): string[] {
   const args = ['--mode', 'rpc'];
+  if (options.ephemeral === true) args.push('--ephemeral');
 
   if (options.configPath !== undefined) args.push('--config', options.configPath);
   if (options.bare === true) args.push('--bare');
@@ -189,12 +196,12 @@ export function buildCliArgs(options: TransportOptions): string[] {
   if (options.idleLogout === false) args.push('--no-idle-logout');
   if (options.contextCompact === false) args.push('--no-context-compact');
   if (options.contextCompact === true) args.push('--context-compact');
-  if (options.persistSession === true) args.push('--persist-session');
-  if (options.sessionId !== undefined) args.push('--session-id', options.sessionId);
-  if (options.resume === true) args.push('--resume');
-  if (options.continue === true) args.push('--continue');
   if (options.fork !== undefined) args.push('--fork', options.fork);
-  if (options.sessionPath !== undefined) args.push('--session-path', options.sessionPath);
+  else {
+    const reference = options.sessionId ?? options.sessionPath;
+    if (reference !== undefined) args.push('--sdk-session-reference', reference);
+    else if (options.resume === true || options.continue === true) args.push('--sdk-resume-last');
+  }
   if (options.autoSaveInterval !== undefined) args.push('--auto-save-interval', String(options.autoSaveInterval));
   if (options.agentsMdEnable === false) args.push('--no-agents-md');
   if (options.agentsMdEnable === true) args.push('--agents-md');
@@ -221,7 +228,7 @@ export function buildCliArgs(options: TransportOptions): string[] {
   if (options.model !== undefined) args.push('--model', options.model);
   if (options.temperature !== undefined) args.push('--temperature', String(options.temperature));
   if (options.yolo !== undefined) args.push('--yolo', options.yolo);
-  if (options.yoloTimeout !== undefined) args.push('--yolo-timeout', String(options.yoloTimeout));
+  if (options.yoloTimeout !== undefined) args.push('--timeout', String(options.yoloTimeout));
   options.addDir?.forEach((dir) => args.push('--add-dir', dir));
   if (options.extraArgs !== undefined) args.push(...options.extraArgs);
 
@@ -233,6 +240,7 @@ export class Transport {
   private lineReader: LineReader | null = null;
   private pendingRequests = new Map<number | string, PendingRequest>();
   private notificationCallbacks = new Map<string, (params: unknown) => void>();
+  private notificationObservers = new Set<(notification: WireNotification) => void>();
   private unknownNotificationCallback: ((method: string, params: unknown) => void) | null = null;
   private terminationCallbacks = new Set<(error: Error) => void>();
   private requestIdCounter = 0;
@@ -281,6 +289,8 @@ export class Transport {
   }
 
   private async startProcess(): Promise<void> {
+    const runtimeSettings = buildRuntimeSettings(this.options);
+    validateCliArguments(buildCliArgs({ ...this.options, extraArgs: [] }));
     const cliPath = this.options.cliPath ?? await this.detectCLIBinary();
     const cwd = this.options.cwd ?? process.cwd();
 
@@ -320,7 +330,7 @@ export class Transport {
     // Enable tool output streaming for SDK events
     env.AUTOHAND_STREAM_TOOL_OUTPUT = '1';
     if (this.options.provider === 'autohandai') {
-      env.AUTOHAND_AI_PLAN = this.options.autohandAIPlan ?? 'cloud';
+      if (this.options.autohandAIPlan !== undefined) env.AUTOHAND_AI_PLAN = this.options.autohandAIPlan;
       if (this.options.apiKey !== undefined) {
         env.AUTOHAND_AI_API_KEY = this.options.apiKey;
       }
@@ -339,6 +349,11 @@ export class Transport {
     if (this.options.provider !== undefined) {
       env.AUTOHAND_PROVIDER = this.options.provider;
     }
+
+    if (needsRuntimeSettings(this.options)) {
+      env.AUTOHAND_RUN_SETTINGS = JSON.stringify(runtimeSettings);
+    }
+    if (env.AUTOHAND_RUN_SETTINGS !== undefined) args.push('--sdk-settings-version', '1');
 
     this.stderrLines = [];
     const child = spawn(cliPath, args, {
@@ -531,6 +546,12 @@ export class Transport {
     this.notificationCallbacks.set(method, callback);
   }
 
+  /** Observe every notification without replacing typed handlers. Delivery is synchronous and ordered. */
+  observeNotifications(callback: (notification: WireNotification) => void): () => void {
+    this.notificationObservers.add(callback);
+    return () => { this.notificationObservers.delete(callback); };
+  }
+
   /** Register the raw fallback invoked when no method-specific handler exists. */
   onUnknownNotification(callback: (method: string, params: unknown) => void): void {
     this.unknownNotificationCallback = callback;
@@ -647,6 +668,14 @@ export class Transport {
         }
       } else {
         // This is a notification
+        if (typeof response.method !== 'string') return;
+        for (const observer of this.notificationObservers) {
+          try {
+            observer({ method: response.method, params: structuredClone(response.params) });
+          } catch {
+            this.log('Notification observer failed');
+          }
+        }
         const callback = this.notificationCallbacks.get(response.method);
         if (callback) {
           callback(response.params);

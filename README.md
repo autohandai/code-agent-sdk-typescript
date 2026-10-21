@@ -801,3 +801,5 @@ Apache License 2.0
 - [CLI Repository](https://github.com/autohandai/cli)
 - [Documentation](https://autohand.ai/sdk/)
 - [Issues](https://github.com/autohandai/code-agent-sdk-typescript/issues)
+
+See [CLI compatibility and migration notes](docs/cli-compatibility.md) for this unreleased source revision, including provider startup settings, complete notifications and ephemeral sessions.
