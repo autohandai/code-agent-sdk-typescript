@@ -192,7 +192,7 @@ export function buildCliArgs(options: TransportOptions): string[] {
   if (options.unrestricted === true) args.push('--unrestricted');
   if (options.autoMode === true) args.push('--auto-mode');
   if (options.autoSkill === true) args.push('--auto-skill');
-  if (options.autoCommit === true) args.push('-c');
+  if (options.autoCommit === true) args.push('--auto-commit');
   if (options.idleLogout === false) args.push('--no-idle-logout');
   if (options.contextCompact === false) args.push('--no-context-compact');
   if (options.contextCompact === true) args.push('--context-compact');
