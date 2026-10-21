@@ -8,6 +8,7 @@ import type {
   HookPostResponseEvent,
   FileModifiedEvent,
   HookSessionErrorEvent,
+  HookRateLimitEvent,
   HookStopEvent,
   HookSessionStartEvent,
   HookSessionEndEvent,
@@ -229,6 +230,40 @@ export function parseHookSessionErrorEvent(value: unknown): HookSessionErrorEven
     ...(value.code !== undefined ? { code: value.code } : {}),
     ...(value.context !== undefined ? { context: value.context } : {}),
     timestamp: value.timestamp,
+  };
+}
+
+const rateLimitNotificationSchema = {
+  error: (value: unknown): value is string => typeof value === 'string',
+  timestamp: (value: unknown): value is string => typeof value === 'string',
+  code: (value: unknown): value is string | undefined => value === undefined || typeof value === 'string',
+  model: (value: unknown): value is string | undefined => value === undefined || typeof value === 'string',
+  provider: (value: unknown): value is string | undefined => value === undefined || typeof value === 'string',
+  retryAfterMs: (value: unknown): value is number | undefined => value === undefined || isNonNegativeFiniteNumber(value),
+  httpStatus: (value: unknown): value is number | undefined => value === undefined
+    || (isNonNegativeInteger(value) && value >= 100 && value <= 599),
+};
+
+export function parseHookRateLimitEvent(value: unknown): HookRateLimitEvent | undefined {
+  if (!isRecord(value)
+    || !rateLimitNotificationSchema.error(value.error)
+    || !rateLimitNotificationSchema.timestamp(value.timestamp)
+    || !rateLimitNotificationSchema.code(value.code)
+    || !rateLimitNotificationSchema.model(value.model)
+    || !rateLimitNotificationSchema.provider(value.provider)
+    || !rateLimitNotificationSchema.retryAfterMs(value.retryAfterMs)
+    || !rateLimitNotificationSchema.httpStatus(value.httpStatus)) {
+    return undefined;
+  }
+  return {
+    type: 'hook_rate_limit',
+    error: value.error,
+    timestamp: value.timestamp,
+    ...(value.code !== undefined ? { code: value.code } : {}),
+    ...(value.model !== undefined ? { model: value.model } : {}),
+    ...(value.provider !== undefined ? { provider: value.provider } : {}),
+    ...(value.retryAfterMs !== undefined ? { retryAfterMs: value.retryAfterMs } : {}),
+    ...(value.httpStatus !== undefined ? { httpStatus: value.httpStatus } : {}),
   };
 }
 

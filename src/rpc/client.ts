@@ -31,8 +31,9 @@ import {
 } from '../session/index.js';
 import type {
   ActiveAgentRecord,
+  WireNotification,
   SDKConfig,
-  PromptParams,
+  RpcPromptParams,
   PromptResult,
   AbortParams,
   AbortResult,
@@ -42,6 +43,8 @@ import type {
   GetStateResult,
   GetMessagesParams,
   GetMessagesResult,
+  BrowserCapabilitiesSetParams,
+  BrowserCapabilitiesSetResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
@@ -129,10 +132,16 @@ import type {
   McpListToolsParams,
   McpListToolsResult,
   McpGetServerConfigsResult,
+  StepDecisionParams,
+  StepDecisionResult,
 } from '../types/index.js';
 import { detectProviderFromModel, validateProviderConfig, getSkillName, getSkillPath } from '../types/index.js';
 import { validateSessionControlRpcResult } from '../validation/session-control-rpc-results.js';
 import { validateExtensionRpcResult } from '../validation/extension-rpc-results.js';
+import {
+  parseStepEndEvent,
+  validateStepDecisionResult,
+} from '../validation/step-control.js';
 import {
   parseAutomodeCompleteEvent,
   parseAutomodeErrorEvent,
@@ -143,6 +152,7 @@ import {
   parseHookPrePromptEvent,
   parseHookPostResponseEvent,
   parseHookSessionErrorEvent,
+  parseHookRateLimitEvent,
   parseHookStopEvent,
   parseHookSessionStartEvent,
   parseHookSessionEndEvent,
@@ -227,6 +237,11 @@ export class RPCClient {
   private eventSubscribers = new Set<EventSubscriber>();
   private eventStreamsClosed = false;
 
+  /** Observe complete CLI packets independently of typed event streams. */
+  onNotification(callback: (notification: WireNotification) => void): () => void {
+    return this.transport.observeNotifications(callback);
+  }
+
   /**
    * Create a new RPCClient instance
    * 
@@ -262,7 +277,7 @@ export class RPCClient {
 
     // Validate provider-specific configuration if provider is set
     if (provider !== undefined) {
-      validateProviderConfig(provider, config);
+      validateProviderConfig(provider, config, { allowInheritedConfig: true });
     }
 
     // Process skills - extract names from file paths and resolve references
@@ -282,6 +297,8 @@ export class RPCClient {
     }
 
     const transportOptions: TransportOptions = {};
+    if (config.features !== undefined) transportOptions.features = config.features;
+    if (config.runSettings !== undefined) transportOptions.runSettings = config.runSettings;
 
     if (config.cwd !== undefined) transportOptions.cwd = config.cwd;
     if (config.cliPath !== undefined) transportOptions.cliPath = config.cliPath;
@@ -320,6 +337,8 @@ export class RPCClient {
     if (config.sessions?.awareness !== undefined) {
       transportOptions.sessionAwareness = config.sessions.awareness;
     }
+    if (config.ephemeral !== undefined) transportOptions.ephemeral = config.ephemeral;
+    if (config.session?.ephemeral !== undefined) transportOptions.ephemeral = config.session.ephemeral;
     if (config.persistSession !== undefined) transportOptions.persistSession = config.persistSession;
     if (config.session?.persist !== undefined) transportOptions.persistSession = config.session.persist;
     if (config.session?.persistSession !== undefined) transportOptions.persistSession = config.session.persistSession;
@@ -412,8 +431,19 @@ export class RPCClient {
    * @param params - Prompt parameters including message and context
    * @returns Result indicating success
    */
-  async prompt(params: PromptParams): Promise<PromptResult> {
+  async prompt(params: RpcPromptParams): Promise<PromptResult> {
     return this.transport.request('autohand.prompt', params) as Promise<PromptResult>;
+  }
+
+  /**
+   * Resolve a CLI tool-step boundary requested by a stopWhen-controlled prompt.
+   */
+  async stepDecision(params: StepDecisionParams): Promise<StepDecisionResult> {
+    const result = await this.transport.request(
+      'autohand.stepDecision',
+      params
+    );
+    return validateStepDecisionResult(result);
   }
 
   /**
@@ -466,6 +496,12 @@ export class RPCClient {
   /**
    * Create a one-time browser handoff for the active session.
    */
+  /** Negotiate browser tools before issuing browser tasks. */
+  async setBrowserCapabilities(params: BrowserCapabilitiesSetParams): Promise<BrowserCapabilitiesSetResult> {
+    const result = await this.transport.request('autohand.browserCapabilities.set', params);
+    return validateSessionControlRpcResult('autohand.browserCapabilities.set', result);
+  }
+
   async createBrowserHandoff(
     params: BrowserHandoffCreateParams = {}
   ): Promise<BrowserHandoffCreateResult> {
@@ -762,6 +798,12 @@ export class RPCClient {
    */
   async getSupportedCommands(): Promise<unknown> {
     return this.transport.request('autohand.getSupportedCommands', {});
+  }
+
+  /** Get the effective subagent registry for this session. */
+  async getSupportedAgents() {
+    const result = await this.transport.request('autohand.getSupportedAgents', {});
+    return validateExtensionRpcResult('autohand.getSupportedAgents', result);
   }
 
   async getGoal(): Promise<GoalSnapshotResult> {
@@ -1078,9 +1120,20 @@ export class RPCClient {
         tokensUsageStatus?: 'actual' | 'unavailable';
         durationMs?: number;
         contextPercent?: number;
+        reason?: 'completed' | 'aborted' | 'stop_condition';
       };
       // Map turn_end to agent_end for streamPrompt to detect completion
-      this.queueEvent({ type: 'agent_end', reason: 'completed', sessionId: p.turnId, timestamp: new Date().toISOString() });
+      const reason = p.reason === 'stop_condition'
+        ? 'stopped'
+        : p.reason === 'aborted'
+          ? 'aborted'
+          : 'completed';
+      this.queueEvent({
+        type: 'agent_end',
+        reason,
+        sessionId: p.turnId,
+        timestamp: new Date().toISOString(),
+      });
       const event: SDKEvent = {
         type: 'turn_end',
         turnId: p.turnId,
@@ -1089,6 +1142,7 @@ export class RPCClient {
         ...(p.tokensUsageStatus !== undefined ? { tokensUsageStatus: p.tokensUsageStatus } : {}),
         ...(p.durationMs !== undefined ? { durationMs: p.durationMs } : {}),
         ...(p.contextPercent !== undefined ? { contextPercent: p.contextPercent } : {}),
+        ...(p.reason !== undefined ? { reason: p.reason } : {}),
       };
       this.queueEvent(event);
     });
@@ -1131,6 +1185,15 @@ export class RPCClient {
       this.queueEvent(event);
     });
 
+    this.transport.onNotification('autohand.stepEnd', (params) => {
+      const event = parseStepEndEvent(params);
+      this.queueEvent(event ?? {
+        type: 'unknown_notification',
+        method: 'autohand.stepEnd',
+        params,
+      });
+    });
+
     // Permission requests
     this.transport.onNotification('autohand.permissionRequest', (params) => {
       const p = params as { requestId: string; tool: string; description: string; context: { command?: string; path?: string; args?: string[] }; options?: string[]; timestamp: string };
@@ -1164,6 +1227,7 @@ export class RPCClient {
       ['autohand.hook.prePrompt', parseHookPrePromptEvent],
       ['autohand.hook.postResponse', parseHookPostResponseEvent],
       ['autohand.hook.sessionError', parseHookSessionErrorEvent],
+      ['autohand.hook.rateLimit', parseHookRateLimitEvent],
       ['autohand.hook.stop', parseHookStopEvent],
       ['autohand.hook.sessionStart', parseHookSessionStartEvent],
       ['autohand.hook.sessionEnd', parseHookSessionEndEvent],

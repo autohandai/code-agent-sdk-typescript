@@ -311,20 +311,20 @@ describe('SDK Configuration Options', () => {
 });
 
 describe('Provider Configuration Validation', () => {
-  it('throws ProviderConfigError when apiKey is missing for cloud provider (openrouter)', () => {
-    expect(captureErrorMessage(() => new AutohandSDK({
+  it('inherits saved CLI credentials when apiKey is omitted for cloud provider (openrouter)', () => {
+    expect(() => new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'openrouter/auto',
-    }))).toBe("apiKey is required for provider 'openrouter'");
+    })).not.toThrow();
   });
 
-  it('throws ProviderConfigError when apiKey is missing for Autohand AI SDK cloud provider', () => {
-    expect(captureErrorMessage(() => new AutohandSDK({
+  it('inherits saved CLI credentials when apiKey is omitted for Autohand AI SDK cloud provider', () => {
+    expect(() => new AutohandSDK({
       cliPath: '/path/to/cli',
       provider: 'autohandai',
       model: 'moa',
       autohandAIPlan: 'cloud',
-    }))).toBe("apiKey is required for provider 'autohandai'");
+    })).not.toThrow();
   });
 
   it('does not require apiKey for Autohand AI SDK local provider config', () => {
@@ -339,11 +339,11 @@ describe('Provider Configuration Validation', () => {
     expect(getTransportOptions(sdk).autohandAIPlan).toBe('local');
   });
 
-  it('throws ProviderConfigError when apiKey is missing for cloud provider (zai)', () => {
-    expect(captureErrorMessage(() => new AutohandSDK({
+  it('inherits saved CLI credentials when apiKey is omitted for cloud provider (zai)', () => {
+    expect(() => new AutohandSDK({
       cliPath: '/path/to/cli',
       model: 'z-ai/glm-4.5-air:free',
-    }))).toBe("apiKey is required for provider 'zai'");
+    })).not.toThrow();
   });
 
   it('throws ProviderConfigError when apiKey is empty string for cloud provider', () => {
@@ -354,12 +354,12 @@ describe('Provider Configuration Validation', () => {
     }))).toBe("apiKey is required for provider 'zai'");
   });
 
-  it('throws ProviderConfigError when apiKey is missing for OpenAI api-key mode', () => {
-    expect(captureErrorMessage(() => new AutohandSDK({
+  it('inherits saved CLI credentials when apiKey is omitted for OpenAI api-key mode', () => {
+    expect(() => new AutohandSDK({
       cliPath: '/path/to/cli',
       provider: 'openai',
       model: 'gpt-4',
-    }))).toBe("apiKey is required for provider 'openai'");
+    })).not.toThrow();
   });
 
   it('does not throw when apiKey is provided for cloud provider', () => {

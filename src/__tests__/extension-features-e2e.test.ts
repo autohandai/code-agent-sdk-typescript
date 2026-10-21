@@ -96,6 +96,42 @@ afterEach(async () => {
 });
 
 describe('extension RPC features', () => {
+  it('discovers effective agents with model and extension provenance', async () => {
+    const agents: import('../types/index.js').AgentInfo[] = [{
+      id: 'reviewer', name: 'reviewer', description: 'Review changes',
+      tools: ['read_file'], model: 'fantail', source: 'extension',
+      extensionId: 'example.review', extensionVersion: '1.0.0', extensionScope: 'project',
+    }];
+    await expect(withSDK({
+      method: 'autohand.getSupportedAgents', params: {}, result: { agents },
+    }, (sdk) => sdk.supportedAgents())).resolves.toEqual(agents);
+  });
+
+  for (const result of [
+    {}, { agents: null }, { agents: [{}] },
+    { agents: [{ id: 'one', name: 'one', description: 'Agent', tools: [1] }] },
+    { agents: [{ id: 'one', name: 'one', description: 'Agent', tools: [], extensionScope: 'invalid' }] },
+  ]) {
+    it(`rejects malformed agent discovery results: ${JSON.stringify(result)}`, async () => {
+      await expect(withSDK({
+        method: 'autohand.getSupportedAgents', params: {}, result,
+      }, (sdk) => sdk.supportedAgents())).rejects.toThrow(/Invalid RPC result for autohand\.getSupportedAgents/);
+    });
+  }
+
+  it('waits for lazy startup before discovering agents', async () => {
+    const agents = [{ id: 'reviewer', name: 'reviewer', description: 'Review', tools: [] }];
+    const cliPath = await createFeatureCli({
+      method: 'autohand.getSupportedAgents', params: {}, result: { agents },
+    });
+    const sdk = new AutohandSDK({ cliPath, timeout: 10_000 });
+    try {
+      expect(await sdk.supportedAgents()).toEqual(agents);
+    } finally {
+      await sdk.close();
+    }
+  });
+
   it('acknowledges a permission request through the spawned CLI', async () => {
     const fixture = {
       method: 'autohand.permissionAcknowledged',
@@ -827,6 +863,16 @@ describe('extension notification features', () => {
 
   const additionalHookCases = [
     {
+      name: 'rate-limit', method: 'autohand.hook.rateLimit', type: 'hook_rate_limit',
+      params: { error: 'Quota exhausted', code: 'rate_limited', retryAfterMs: 60_000, httpStatus: 429, model: 'test-model', provider: 'openai', timestamp: 't1' },
+      malformed: { error: 'Quota exhausted', retryAfterMs: '60000', timestamp: 't1' },
+    },
+    {
+      name: 'minimal rate-limit', method: 'autohand.hook.rateLimit', type: 'hook_rate_limit',
+      params: { error: 'Quota exhausted', timestamp: 't1' },
+      malformed: { error: 'Quota exhausted', timestamp: 1 },
+    },
+    {
       name: 'file-modified', method: 'autohand.hook.fileModified', type: 'file_modified',
       params: { filePath: 'src/index.ts', changeType: 'modify', toolId: 'tool-1', timestamp: 't1' },
       malformed: { filePath: 'src/index.ts', changeType: 'rename', toolId: 'tool-1', timestamp: 't1' },
@@ -905,6 +951,31 @@ describe('extension notification features', () => {
       });
     });
   }
+
+  it('preserves malformed rate-limit fields without emitting an invalid typed event', async () => {
+    const malformedFields = [
+      { error: 42 }, { timestamp: null }, { code: 42 },
+      { model: [] }, { provider: {} }, { retryAfterMs: -1 },
+      { retryAfterMs: null }, { httpStatus: 429.5 }, { httpStatus: 600 },
+    ];
+    const notifications = malformedFields.map((fields) => ({
+      method: 'autohand.hook.rateLimit',
+      params: { error: 'Quota exhausted', timestamp: 't1', ...fields },
+    }));
+    await withSDK({ method: 'unused', params: {}, result: {}, notifications }, async (sdk) => {
+      const events = sdk.events();
+      const first = events.next();
+      await sdk.getState();
+      try {
+        for (const [index, notification] of notifications.entries()) {
+          const result = await (index === 0 ? first : events.next());
+          expect(result.value).toEqual({ type: 'unknown_notification', ...notification });
+        }
+      } finally {
+        await events.return(undefined);
+      }
+    });
+  });
 
   const fractionalContextCounterCases = [
     {

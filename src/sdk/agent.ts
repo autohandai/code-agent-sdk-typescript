@@ -1,6 +1,9 @@
 import { AutohandSDK, formatSlashCommand } from './index.js';
 import type {
   ActiveAgentRecord,
+  WireNotification,
+  GetStateParams, GetStateResult, GetMessagesParams, GetMessagesResult,
+  ContextUsage, AccountInfo, ModelInfo, AgentInfo, McpServerConfig,
   CreateGoalParams,
   GoalMutationRpcResult,
   GoalSnapshotResult,
@@ -61,6 +64,8 @@ import type {
   AutoresearchPruneResult,
   GetSkillsRegistryParams,
   GetSkillsRegistryResult,
+  BrowserCapabilitiesSetParams,
+  BrowserCapabilitiesSetResult,
   BrowserHandoffCreateParams,
   BrowserHandoffCreateResult,
   BrowserHandoffAttachParams,
@@ -78,6 +83,8 @@ import type {
   McpListToolsParams,
   McpListToolsResult,
   McpGetServerConfigsResult,
+  AgentStep,
+  StopCondition,
 } from '../types/index.js';
 
 export type AgentInput = string | PromptParams;
@@ -119,9 +126,35 @@ export interface AgentOptions extends SDKConfig {
 
 export interface RunResult {
   id: string;
-  status: 'completed' | 'aborted';
+  status: 'completed' | 'aborted' | 'stopped';
   text: string;
   events: SDKEvent[];
+  steps: AgentStep[];
+}
+
+/**
+ * Stop after the requested number of completed tool steps.
+ *
+ * This mirrors AI SDK's `isStepCount()` helper while preserving the step
+ * boundary across the CLI subprocess.
+ */
+export function isStepCount(count: number): StopCondition {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new RangeError('isStepCount count must be a positive integer.');
+  }
+
+  return async ({ steps }) => steps.length >= count;
+}
+
+/** Stop after a completed step that called the named tool. */
+export function hasToolCall(toolName: string): StopCondition {
+  const normalizedToolName = toolName.trim();
+  if (normalizedToolName === '') {
+    throw new TypeError('hasToolCall toolName must be a non-empty string.');
+  }
+
+  return async ({ steps }) =>
+    steps.at(-1)?.toolCalls.some((call) => call.tool === normalizedToolName) ?? false;
 }
 
 export class StructuredOutputError extends Error {
@@ -167,6 +200,7 @@ function toPromptParams(input: AgentInput, options?: AgentSendOptions): PromptPa
     if (options?.images !== undefined) params.images = options.images;
     if (options?.thinkingLevel !== undefined) params.thinkingLevel = options.thinkingLevel;
     if (options?.agentsMd !== undefined) params.agentsMd = options.agentsMd;
+    if (options?.stopWhen !== undefined) params.stopWhen = options.stopWhen;
     return params;
   }
 
@@ -179,6 +213,7 @@ function toPromptParams(input: AgentInput, options?: AgentSendOptions): PromptPa
   if (options.images !== undefined) params.images = options.images;
   if (options.thinkingLevel !== undefined) params.thinkingLevel = options.thinkingLevel;
   if (options.agentsMd !== undefined) params.agentsMd = options.agentsMd;
+  if (options.stopWhen !== undefined) params.stopWhen = options.stopWhen;
   return params;
 }
 
@@ -359,8 +394,10 @@ export class Run {
   private resultPromise: Promise<RunResult> | undefined;
   private completed = false;
   private aborted = false;
+  private stopped = false;
   private error: unknown;
   private text = '';
+  private steps: AgentStep[] = [];
 
   constructor(
     private readonly sdk: AutohandSDK,
@@ -450,6 +487,11 @@ export class Run {
       this.text += event.delta;
     } else if (event.type === 'message_end') {
       this.text = event.content;
+    } else if (event.type === 'step_end') {
+      this.steps.push(event.step);
+    } else if (event.type === 'agent_end') {
+      this.aborted = event.reason === 'aborted';
+      this.stopped = event.reason === 'stopped';
     }
 
     this.notify();
@@ -458,9 +500,10 @@ export class Run {
   private createResult(): RunResult {
     return {
       id: this.id,
-      status: this.aborted ? 'aborted' : 'completed',
+      status: this.aborted ? 'aborted' : this.stopped ? 'stopped' : 'completed',
       text: this.text,
       events: [...this.eventsBuffer],
+      steps: [...this.steps],
     };
   }
 
@@ -490,6 +533,11 @@ export class Agent {
    */
   static fromSDK(sdk: AutohandSDK): Agent {
     return new Agent(sdk);
+  }
+
+  /** Observe complete CLI notifications alongside typed events. */
+  onNotification(callback: (notification: WireNotification) => void): () => void {
+    return this.sdk.onNotification(callback);
   }
 
   /**
@@ -604,8 +652,42 @@ export class Agent {
     await this.sdk.close();
   }
 
+  /** Read the persisted session identity and current CLI state. */
+  getState(params?: GetStateParams): Promise<GetStateResult> { return this.sdk.getState(params); }
+  /** Read messages from this agent's active CLI session. */
+  getMessages(params?: GetMessagesParams): Promise<GetMessagesResult> { return this.sdk.getMessages(params); }
+  /** List models supported by this CLI configuration. */
+  supportedModels(): Promise<ModelInfo[]> { return this.sdk.supportedModels(); }
+  /** List effective built-in, inline and extension agents. */
+  supportedAgents(): Promise<AgentInfo[]> { return this.sdk.supportedAgents(); }
+  /** Return token and context-window usage. */
+  getContextUsage(): Promise<ContextUsage> { return this.sdk.getContextUsage(); }
+  /** Reload installed CLI plugins. */
+  reloadPlugins(): Promise<unknown> { return this.sdk.reloadPlugins(); }
+  /** Return the active account's information. */
+  accountInfo(): Promise<AccountInfo> { return this.sdk.accountInfo(); }
+  /** Apply feature settings to the active runtime. */
+  applyFlagSettings(settings: Partial<SDKConfig>): Promise<void> { return this.sdk.applyFlagSettings(settings); }
+  /** Change the active permission mode. */
+  setPermissionMode(mode: SDKConfig['permissionMode']): Promise<void> { return this.sdk.setPermissionMode(mode); }
+  /** Change the active model. */
+  setModel(model?: string): Promise<void> { return this.sdk.setModel(model); }
+  /** Set a thinking budget, or restore its default with null. */
+  setMaxThinkingTokens(tokens: number | null): Promise<void> { return this.sdk.setMaxThinkingTokens(tokens); }
+  /** Enable or disable one MCP server. */
+  toggleMcpServer(name: string, enabled: boolean): Promise<void> { return this.sdk.toggleMcpServer(name, enabled); }
+  /** Reconnect an MCP server. */
+  reconnectMcpServer(name: string): Promise<void> { return this.sdk.reconnectMcpServer(name); }
+  /** Replace MCP server configurations for this session. */
+  setMcpServers(servers: Record<string, McpServerConfig>): Promise<unknown> { return this.sdk.setMcpServers(servers); }
+
   async reset(): Promise<ResetResult> {
     return this.sdk.reset();
+  }
+
+  /** Negotiate browser tools before issuing browser tasks. */
+  async setBrowserCapabilities(params: BrowserCapabilitiesSetParams): Promise<BrowserCapabilitiesSetResult> {
+    return this.sdk.setBrowserCapabilities(params);
   }
 
   async createBrowserHandoff(
