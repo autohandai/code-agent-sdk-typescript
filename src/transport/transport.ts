@@ -565,7 +565,11 @@ export class Transport {
     try {
       while (!reader.isClosed() || reader.hasPendingLines()) {
         const line = await reader.readLine();
-        this.handleLine(line);
+        const protocolFailure = this.handleLine(line);
+        if (protocolFailure !== undefined) {
+          failure = protocolFailure;
+          break;
+        }
       }
     } catch (error) {
       failure = new Error(
@@ -609,9 +613,20 @@ export class Transport {
    * @param line - Raw JSON line from stdout
    * @private
    */
-  private handleLine(line: string): void {
+  private handleLine(line: string): Error | undefined {
     try {
       const response = JSON.parse(line);
+
+      // The CLI sends startup failures without a request ID, before it can
+      // answer getState. Preserve that diagnostic when terminating the session.
+      if (response?.id === null && this.isErrorResponse(response)) {
+        const error: unknown = response.error;
+        if (typeof error === 'object' && error !== null
+          && 'message' in error && typeof error.message === 'string') {
+          return new Error(error.message);
+        }
+        return new Error('Malformed global JSON-RPC error response');
+      }
 
       if (response.id !== undefined) {
         // This is a response to a request
@@ -657,6 +672,7 @@ export class Transport {
     } catch {
       this.log(`Error parsing line: ${line}`);
     }
+    return undefined;
   }
 
   /**

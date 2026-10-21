@@ -23,6 +23,9 @@ while IFS= read -r line; do
   id=$(printf '%s\\n' "$line" | sed -E 's/.*"id":([0-9]+).*/\\1/')
   case "$line" in
     *'"method":"test.exit"'*) exit 17 ;;
+    *'"method":"test.startup_error"'*)
+      printf '{"jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":"Authentication required"}}\\n'
+      exit 1 ;;
     *'"method":"test.close_stdout"'*) exec 1>&-; sleep 5 ;;
     *'"method":"test.final_no_newline"'*)
       trap '' TERM
@@ -104,6 +107,16 @@ afterEach(async () => {
 });
 
 describe('transport reliability', () => {
+  it('preserves global RPC startup errors instead of reporting only stdout closure', async () => {
+    const transport = new Transport({ cliPath: await createFakeCli(), timeout: 1_000 });
+    try {
+      await transport.start();
+      await expect(transport.request('test.startup_error', {})).rejects.toThrow('Authentication required');
+    } finally {
+      await transport.stop();
+    }
+    expect(transport.isRunning()).toBe(false);
+  });
   it('uses AUTOHAND_CLI_PATH for a real RPC session, including paths with spaces', async () => {
     const original = process.env.AUTOHAND_CLI_PATH;
     const source = await createFakeCli();
@@ -172,7 +185,7 @@ describe('transport reliability', () => {
     const transport = new Transport({
       cliPath,
       env: { AUTOHAND_TEST_ENV: 'forwarded' },
-      timeout: 500,
+      timeout: 1_000,
     });
     await transport.start();
     await expect(transport.request('autohand.getState', {})).resolves.toEqual({
