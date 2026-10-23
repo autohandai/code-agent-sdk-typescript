@@ -794,7 +794,7 @@ This is a **CLI wrapper** implementation. The previous library SDK (`@autohandai
 
 ## License
 
-Apache License 2.0
+Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Links
 
