@@ -23,6 +23,7 @@
   },
   "sideEffects": false,
   "files": [
+    "COMMERCIAL.md",
     "dist",
     "!dist/__tests__",
     "README.md",

@@ -794,7 +794,7 @@ This is a **CLI wrapper** implementation. The previous library SDK (`@autohandai
 
 ## License
 
-Apache License 2.0
+Apache License 2.0 - Free for individuals, non-profits, educational institutions, open source projects, and companies with ARR under $5M. See [LICENSE](LICENSE) and [COMMERCIAL.md](COMMERCIAL.md) for details.
 
 ## Links
 
